@@ -1,6 +1,6 @@
 FROM rust:bookworm
-RUN apt-get update && apt-get install curl meson ninja-build pkg-config git
-RUN sh -c "if [ $(uname -m) = x86_64 ]; then apt-get update && apt-get install nasm;fi"
+RUN apt-get update && apt-get install -y curl meson ninja-build pkg-config git
+RUN sh -c "if [ $(uname -m) = x86_64 ]; then apt-get update && apt-get install -y nasm;fi"
 ENV CARGO_HOME=/var/cache/cargo
 RUN mkdir /app
 ENV SYSTEM_DEPS_BUILD_INTERNAL=always
