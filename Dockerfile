@@ -1,6 +1,6 @@
-FROM rust:alpine
-RUN apk add --no-cache musl-dev curl meson ninja pkgconfig git
-RUN sh -c "if [ $(uname -m) = x86_64 ]; then apk add --no-cache nasm;fi"
+FROM rust:bookworm
+RUN apt-get update && apt-get install curl meson ninja-build pkg-config git
+RUN sh -c "if [ $(uname -m) = x86_64 ]; then apt-get update && apt-get install nasm;fi"
 RUN curl -sSL https://github.com/mozilla/sccache/releases/download/v0.7.7/sccache-v0.7.7-x86_64-unknown-linux-musl.tar.gz | tar -zxf - -C /tmp && mv /tmp/sccache*/sccache /usr/local/bin && rm -rf /tmp/sccache*
 ENV CARGO_HOME=/var/cache/cargo
 RUN mkdir /app
@@ -15,12 +15,13 @@ ENV RUSTC_WRAPPER=/usr/local/bin/sccache
 ENV SCCACHE_DIR=/var/cache/sccache
 RUN --mount=type=cache,target=/var/cache/cargo --mount=type=cache,target=/var/cache/sccache cargo build --release --offline
 
-FROM alpine:latest
+FROM debian:bookworm
 ARG UID="852"
 ARG GID="852"
-RUN addgroup -g "${GID}" proxy && adduser -u "${UID}" -G proxy -D -h /media-proxy-rs -s /bin/sh proxy
+RUN groupadd -g "${GID}" media-proxy && useradd -u "${UID}" -g "${GID}" -d /media-proxy-rs -s /bin/sh media-proxy
 WORKDIR /media-proxy-rs
-USER proxy
+RUN chown -R media-proxy:media-proxy /media-proxy-rs
+USER media-proxy
 COPY asset ./asset
 COPY --from=0 /app/target/release/media-proxy-rs ./media-proxy-rs
 EXPOSE 12766
