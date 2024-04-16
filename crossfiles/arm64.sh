@@ -15,4 +15,5 @@ export SYSTEM_DEPS_LINK=static
 export RUSTFLAGS="-C link-args=-Wl,-lc -C linker=aarch64-linux-musl-gcc"
 export PKG_CONFIG_SYSROOT_DIR="/aarch64-linux-musl-cross/"
 export RUST_TARGET=aarch64-unknown-linux-musl
-cp /app/dav1d/lib/* /aarch64-linux-musl-cross/lib
+cp -r /app/dav1d/lib/* /aarch64-linux-musl-cross/lib/
+cp -r /app/dav1d/include/dav1d /aarch64-linux-musl-cross/include/
