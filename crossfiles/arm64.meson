@@ -3,6 +3,10 @@ c = 'aarch64-linux-musl-gcc'
 cpp = 'aarch64-linux-musl-g++'
 ar = 'aarch64-linux-musl-ar'
 
+[properties]
+c_args = '-target aarch64-linux-musl'
+c_link_args = '-target aarch64-linux-musl'
+
 [host_machine]
 system = 'linux'
 cpu_family = 'aarch64'
