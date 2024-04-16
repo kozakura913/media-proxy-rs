@@ -9,6 +9,8 @@ RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.
 WORKDIR /dav1d
 RUN mkdir /app
 COPY crossfiles /app/crossfiles
+ENV CC=aarch64-linux-musl-gcc
+ENV AR=aarch64-linux-musl-ar
 RUN meson build -Dprefix=/app/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release --cross-file=/app/crossfiles/$TARGETARCH.meson 
 RUN ninja -C build && ninja -C build install
 RUN rustup target add aarch64-unknown-linux-musl
