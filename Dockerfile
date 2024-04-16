@@ -17,6 +17,7 @@ ENV LD_LIBRARY_PATH=/app/dav1d/lib
 ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
 ENV RUSTFLAGS="-C link-args=-Wl,-lc"
+ENV PKG_CONFIG_SYSROOT_DIR="/aarch64-linux-musl-cross/"
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY src ./src
