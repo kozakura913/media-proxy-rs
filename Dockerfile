@@ -1,14 +1,25 @@
-FROM rust:alpine
+FROM --platform=$BUILDPLATFORM rust:alpine
+ARG BUILDARCH
+ARG TARGETARCH
 RUN apk add --no-cache musl-dev curl meson ninja pkgconfig git
-RUN sh -c "if [ $(uname -m) = x86_64 ]; then apk add --no-cache nasm;fi"
+RUN sh -c "if [ $TARGETARCH = amd64 ]; then apk add --no-cache nasm;fi"
+RUN mkdir /dav1d
+RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d
+WORKDIR /dav1d
+RUN sh -c "if [ $TARGETARCH = arm64 ]; then export CROSS_OPTION=/dav1d/package/crossfiles/aarch64-linux-clang.meson;fi"
+RUN meson build -Dprefix=/app/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release $CROSS_OPTION
+RUN ninja -C build && ninja -C build install
+ENV PKG_CONFIG_PATH=/app/dav1d/lib/pkgconfig
+ENV LD_LIBRARY_PATH=/app/dav1d/lib
 ENV CARGO_HOME=/var/cache/cargo
-RUN mkdir /app
-ENV SYSTEM_DEPS_BUILD_INTERNAL=always
+ENV SYSTEM_DEPS_LINK=static
 ENV RUSTFLAGS="-C link-args=-Wl,-lc"
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY src ./src
 COPY Cargo.toml ./Cargo.toml
+COPY asset ./asset
+RUN --mount=type=cache,target=/var/cache/cargo cargo test
 RUN --mount=type=cache,target=/var/cache/cargo cargo build --release
 
 FROM alpine:latest
