@@ -11,6 +11,7 @@ RUN mkdir /app
 COPY crossfiles /app/crossfiles
 RUN meson build -Dprefix=/app/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release --cross-file=/app/crossfiles/$TARGETARCH.meson 
 RUN ninja -C build && ninja -C build install
+RUN rustup target add aarch64-unknown-linux-musl
 ENV PKG_CONFIG_PATH=/app/dav1d/lib/pkgconfig
 ENV LD_LIBRARY_PATH=/app/dav1d/lib
 ENV CARGO_HOME=/var/cache/cargo
