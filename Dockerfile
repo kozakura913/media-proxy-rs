@@ -1,7 +1,7 @@
 FROM --platform=$BUILDPLATFORM rust:alpine
 ARG BUILDARCH
 ARG TARGETARCH
-RUN apk add --no-cache musl-dev curl meson ninja pkgconfig git
+RUN apk add --no-cache clang musl-dev curl meson ninja pkgconfig git
 RUN sh -c "if [ $TARGETARCH = amd64 ]; then apk add --no-cache nasm;fi"
 RUN mkdir /dav1d
 RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d
