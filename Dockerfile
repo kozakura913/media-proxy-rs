@@ -2,30 +2,14 @@ FROM --platform=$BUILDPLATFORM rust:alpine
 ARG BUILDARCH
 ARG TARGETARCH
 RUN apk add --no-cache clang musl-dev curl meson ninja pkgconfig git
-RUN curl -sSL https://musl.cc/aarch64-linux-musl-cross.tgz | tar -zxf - -C /
-ENV PATH="/aarch64-linux-musl-cross/bin:${PATH}"
-RUN mkdir /dav1d
-RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d
-WORKDIR /dav1d
-RUN mkdir /app
 COPY crossfiles /app/crossfiles
-ENV CC=aarch64-linux-musl-gcc
-ENV AR=aarch64-linux-musl-ar
-RUN meson build -Dprefix=/app/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release --cross-file=/app/crossfiles/$TARGETARCH.meson 
-RUN ninja -C build && ninja -C build install
-RUN rustup target add aarch64-unknown-linux-musl
-ENV PKG_CONFIG_PATH=/app/dav1d/lib/pkgconfig
-ENV LD_LIBRARY_PATH=/app/dav1d/lib
-ENV CARGO_HOME=/var/cache/cargo
-ENV SYSTEM_DEPS_LINK=static
-ENV RUSTFLAGS="-C link-args=-Wl,-lc -C linker=aarch64-linux-musl-gcc"
-ENV PKG_CONFIG_SYSROOT_DIR="/aarch64-linux-musl-cross/"
+RUN sh /app/crossfiles/arm64.sh
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY src ./src
 COPY Cargo.toml ./Cargo.toml
 COPY asset ./asset
-RUN --mount=type=cache,target=/var/cache/cargo cargo build --release --target aarch64-unknown-linux-musl
+RUN --mount=type=cache,target=/var/cache/cargo cargo build --release --target ${RUST_TARGET}
 
 FROM alpine:latest
 ARG UID="852"
