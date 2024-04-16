@@ -8,7 +8,7 @@ RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.
 WORKDIR /dav1d
 RUN curl https://code.videolan.org/videolan/dav1d/-/raw/1.4.1/package/crossfiles/aarch64-linux-clang.meson > /dav1d/package/crossfiles/arm64.meson
 RUN meson build -Dprefix=/app/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release \
-	$(sh -c "if [ $TARGETARCH != $BUILDPLATFORM ]; then echo -n --cross-file=/dav1d/package/crossfiles/$TARGETARCH.meson;fi") 
+	$(sh -c "if [ $TARGETARCH != $BUILDARCH ]; then echo -n --cross-file=/dav1d/package/crossfiles/$TARGETARCH.meson;fi") 
 RUN ninja -C build && ninja -C build install
 ENV PKG_CONFIG_PATH=/app/dav1d/lib/pkgconfig
 ENV LD_LIBRARY_PATH=/app/dav1d/lib
