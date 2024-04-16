@@ -1,0 +1,9 @@
+[binaries]
+c = 'clang'
+cpp = 'clang++'
+
+[host_machine]
+system = 'linux'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'

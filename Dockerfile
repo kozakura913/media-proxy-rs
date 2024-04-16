@@ -6,9 +6,9 @@ RUN sh -c "if [ $TARGETARCH = amd64 ]; then apk add --no-cache nasm;fi"
 RUN mkdir /dav1d
 RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d
 WORKDIR /dav1d
-RUN curl https://code.videolan.org/videolan/dav1d/-/raw/1.4.1/package/crossfiles/aarch64-linux-clang.meson > /dav1d/package/crossfiles/arm64.meson
-RUN meson build -Dprefix=/app/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release \
-	$(sh -c "if [ $TARGETARCH != $BUILDARCH ]; then echo -n --cross-file=/dav1d/package/crossfiles/$TARGETARCH.meson;fi") 
+RUN mkdir /app
+COPY crossfiles /app/crossfiles
+RUN meson build -Dprefix=/app/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release --cross-file=/app/crossfiles/$TARGETARCH.meson 
 RUN ninja -C build && ninja -C build install
 ENV PKG_CONFIG_PATH=/app/dav1d/lib/pkgconfig
 ENV LD_LIBRARY_PATH=/app/dav1d/lib
