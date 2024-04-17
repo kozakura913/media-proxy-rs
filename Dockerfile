@@ -14,7 +14,7 @@ COPY avif-decoder_dep ./avif-decoder_dep
 COPY src ./src
 COPY Cargo.toml ./Cargo.toml
 COPY asset ./asset
-RUN --mount=type=cache,target=/var/cache/cargo sh /app/crossfiles/build.sh
+RUN --mount=type=cache,target=/var/cache/cargo --mount=type=cache,target=/app/target sh /app/crossfiles/build.sh
 
 FROM alpine:latest
 ARG UID="852"

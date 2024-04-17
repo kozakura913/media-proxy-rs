@@ -65,6 +65,24 @@ jobs:
         with:
           images: ${{ env.REGISTRY_IMAGE }}
 
+      - name: CacheMount
+        uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            cargo-home
+            app-target
+          key: cache-${{ matrix.platform }}-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: inject cache into docker
+        uses: reproducible-containers/buildkit-cache-dance@v3.1.0
+        with:
+          cache-map: |
+            {
+              "cargo-home": "/var/cache/cargo",
+              "app-target": "/app/target"
+            }
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image
