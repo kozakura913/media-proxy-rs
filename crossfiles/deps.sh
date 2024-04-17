@@ -1,9 +1,12 @@
 set -eu
-source /app/crossfiles/${TARGETARCH}.sh
-rustup target add ${RUST_TARGET}
 if [ ${TARGETARCH} = amd64 ]; then
 	apk add --no-cache nasm
 fi
+if [ ${TARGETARCH} = ${BUILDARCH} ]; then
+	exit 0
+fi
+source /app/crossfiles/${TARGETARCH}.sh
+rustup target add ${RUST_TARGET}
 curl -sSL https://musl.cc/${MUSL_NAME}.tgz | tar -zxf - -C /
 cd /dav1d
 cat <<EOF > crossfile.meson
