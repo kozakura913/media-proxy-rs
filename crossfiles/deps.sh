@@ -1,7 +1,4 @@
 set -eu
-if [ ${TARGETARCH} = amd64 ]; then
-	apk add --no-cache nasm
-fi
 if [ ${TARGETARCH} = ${BUILDARCH} ]; then
 	exit 0
 fi
