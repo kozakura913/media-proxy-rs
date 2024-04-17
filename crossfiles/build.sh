@@ -6,7 +6,7 @@ if [ ${TARGETARCH} = ${BUILDARCH} ]; then
 	cp /app/target/release/media-proxy-rs /app/media-proxy-rs
 	exit 0
 fi
-export RUSTFLAGS=${RUSTFLAGS}" -C link-arg=-fuse-ld=mold"
 source /app/crossfiles/${TARGETARCH}.sh
+export RUSTFLAGS=${RUSTFLAGS}" -C link-arg=-fuse-ld=mold"
 cargo build --release --target ${RUST_TARGET}
 cp /app/target/${RUST_TARGET}/release/media-proxy-rs /app/media-proxy-rs
