@@ -3,6 +3,7 @@ ARG BUILDARCH
 ARG TARGETARCH
 RUN apk add --no-cache clang musl-dev curl meson ninja pkgconfig git
 RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d
+RUN apk add mold
 ENV PKG_CONFIG_PATH=/app/dav1d/lib/pkgconfig
 ENV LD_LIBRARY_PATH=/app/dav1d/lib
 ENV CARGO_HOME=/var/cache/cargo
