@@ -54,6 +54,7 @@ impl Into<image::imageops::FilterType> for FilterType{
 	}
 }
 fn main() {
+	println!("にゃーん");
 	let config_path=match std::env::var("MEDIA_PROXY_CONFIG_PATH"){
 		Ok(path)=>{
 			if path.is_empty(){
