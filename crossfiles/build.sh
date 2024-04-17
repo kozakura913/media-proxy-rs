@@ -7,5 +7,6 @@ if [ ${TARGETARCH} = ${BUILDARCH} ]; then
 	exit 0
 fi
 source /app/crossfiles/${TARGETARCH}.sh
+export RUSTFLAGS=${RUSTFLAGS}" -C link-arg=-fuse-ld=mold"
 cargo build --release --target ${RUST_TARGET}
 cp /app/target/${RUST_TARGET}/release/media-proxy-rs /app/media-proxy-rs
