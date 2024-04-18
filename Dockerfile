@@ -1,4 +1,10 @@
-FROM ghcr.io/kozakura913/static-dav1d-lib:master
+FROM alpine:latest
+RUN apk add --no-cache clang musl-dev meson ninja pkgconfig nasm git
+RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d_src
+WORKDIR /dav1d_src
+RUN meson build -Dprefix=/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release
+RUN ninja -C build
+RUN ninja -C build install
 
 FROM --platform=$BUILDPLATFORM rust:alpine
 ARG BUILDARCH
@@ -9,9 +15,9 @@ ENV PKG_CONFIG_PATH=/dav1d/lib/pkgconfig
 ENV LD_LIBRARY_PATH=/dav1d/lib
 ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
-COPY --from=0 /dav1d /dav1d
 COPY crossfiles /app/crossfiles
 RUN sh /app/crossfiles/deps.sh
+COPY --from=0 /dav1d /dav1d
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY src ./src

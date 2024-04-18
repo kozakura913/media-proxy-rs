@@ -7,4 +7,3 @@ fi
 rustup target add ${RUST_TARGET}
 curl -sSL https://musl.cc/${MUSL_NAME}.tgz | tar -zxf - -C /
 mkdir -p /${MUSL_NAME}/dav1d/
-cp -r /dav1d/lib /${MUSL_NAME}/dav1d/lib
