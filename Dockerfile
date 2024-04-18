@@ -1,12 +1,15 @@
+FROM ghcr.io/kozakura913/static-dav1d-lib:master
+
 FROM --platform=$BUILDPLATFORM rust:alpine
 ARG BUILDARCH
 ARG TARGETARCH
-RUN apk add --no-cache clang musl-dev curl meson ninja pkgconfig git nasm mold
-RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d
-ENV PKG_CONFIG_PATH=/app/dav1d/lib/pkgconfig
-ENV LD_LIBRARY_PATH=/app/dav1d/lib
+ARG TARGETVARIANT
+RUN apk add --no-cache clang musl-dev curl pkgconfig mold
+ENV PKG_CONFIG_PATH=/dav1d/lib/pkgconfig
+ENV LD_LIBRARY_PATH=/dav1d/lib
 ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
+COPY --from=0 /dav1d /dav1d
 COPY crossfiles /app/crossfiles
 RUN sh /app/crossfiles/deps.sh
 WORKDIR /app
@@ -23,6 +26,6 @@ RUN addgroup -g "${GID}" proxy && adduser -u "${UID}" -G proxy -D -h /media-prox
 WORKDIR /media-proxy-rs
 USER proxy
 COPY asset ./asset
-COPY --from=0 /app/media-proxy-rs ./media-proxy-rs
+COPY --from=1 /app/media-proxy-rs ./media-proxy-rs
 EXPOSE 12766
 CMD ["./media-proxy-rs"]
