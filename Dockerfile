@@ -4,7 +4,7 @@ FROM --platform=$BUILDPLATFORM rust:alpine
 ARG BUILDARCH
 ARG TARGETARCH
 ARG TARGETVARIANT
-RUN apk add --no-cache clang musl-dev curl pkgconfig mold
+RUN apk add --no-cache clang musl-dev curl pkgconfig nasm mold
 ENV PKG_CONFIG_PATH=/dav1d/lib/pkgconfig
 ENV LD_LIBRARY_PATH=/dav1d/lib
 ENV CARGO_HOME=/var/cache/cargo
