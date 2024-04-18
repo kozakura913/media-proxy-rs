@@ -6,7 +6,7 @@ source /app/crossfiles/${TARGETARCH}.sh
 rustup target add ${RUST_TARGET}
 curl -sSL https://musl.cc/${MUSL_NAME}.tgz | tar -zxf - -C /
 cd /dav1d
-cat <<EOF > crossfile.meson
+cat <<EOF >> crossfile.meson
 [binaries]
 c = '${CC}'
 cpp = '${CXX}'
