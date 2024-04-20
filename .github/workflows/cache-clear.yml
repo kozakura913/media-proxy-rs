@@ -1,4 +1,4 @@
-name: Cache Clear
+name: CacheClear
 
 on: workflow_dispatch
 
