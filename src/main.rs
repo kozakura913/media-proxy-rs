@@ -1,4 +1,4 @@
-use std::{io::{Read, Write}, net::SocketAddr, str::FromStr, sync::Arc};
+use std::{io::{Read, Write}, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
 use axum::{body::StreamBody, http::HeaderMap, response::IntoResponse, Router};
 use serde::{Deserialize, Serialize};
@@ -53,6 +53,41 @@ impl Into<image::imageops::FilterType> for FilterType{
 		}
 	}
 }
+impl Into<fast_image_resize::FilterType> for FilterType{
+	fn into(self) -> fast_image_resize::FilterType {
+		match self {
+			FilterType::Nearest => fast_image_resize::FilterType::Box,
+			FilterType::Triangle => fast_image_resize::FilterType::Bilinear,
+			FilterType::CatmullRom => fast_image_resize::FilterType::CatmullRom,
+			FilterType::Gaussian => fast_image_resize::FilterType::Mitchell,
+			FilterType::Lanczos3 => fast_image_resize::FilterType::Lanczos3,
+		}
+	}
+}
+async fn shutdown_signal() {
+	use tokio::signal;
+	use futures::{future::FutureExt,pin_mut};
+	let ctrl_c = async {
+		signal::ctrl_c()
+			.await
+			.expect("failed to install Ctrl+C handler");
+	}.fuse();
+
+	#[cfg(unix)]
+	let terminate = async {
+		signal::unix::signal(signal::unix::SignalKind::terminate())
+			.expect("failed to install signal handler")
+			.recv()
+			.await;
+	}.fuse();
+	#[cfg(not(unix))]
+	let terminate = std::future::pending::<()>().fuse();
+	pin_mut!(ctrl_c, terminate);
+	futures::select!{
+		_ = ctrl_c => {},
+		_ = terminate => {},
+	}
+}
 fn main() {
 	println!("にゃーん");
 	let config_path=match std::env::var("MEDIA_PROXY_CONFIG_PATH"){
@@ -68,7 +103,7 @@ fn main() {
 	if !std::path::Path::new(&config_path).exists(){
 		let default_config=ConfigFile{
 			bind_addr: "0.0.0.0:12766".to_owned(),
-			timeout:1000,
+			timeout:10000,
 			user_agent: "https://github.com/yojo-art/media-proxy-rs".to_owned(),
 			max_size:256*1024*1024,
 			proxy:None,
@@ -80,7 +115,7 @@ fn main() {
 			].to_vec(),
 			load_system_fonts:true,
 			webp_quality: 75f32,
-			encode_avif:true,
+			encode_avif:false,
 		};
 		let default_config=serde_json::to_string_pretty(&default_config).unwrap();
 		std::fs::File::create(&config_path).expect("create default config.json").write_all(default_config.as_bytes()).unwrap();
@@ -109,26 +144,38 @@ fn main() {
 		let http_addr:SocketAddr = arg_tup.1.bind_addr.parse().unwrap();
 		let app = Router::new();
 		let arg_tup0=arg_tup.clone();
-		let app=app.route("/",axum::routing::get(move|path,headers,parms|get_file(path,headers,arg_tup0.clone(),parms)));
-		let app=app.route("/*path",axum::routing::get(move|path,headers,parms|get_file(path,headers,arg_tup.clone(),parms)));
-		axum::Server::bind(&http_addr).serve(app.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap();
+		let app=app.route("/",axum::routing::get(move|headers,parms|get_file(None,headers,arg_tup0.clone(),parms)));
+		let app=app.route("/*path",axum::routing::get(move|path,headers,parms|get_file(Some(path),headers,arg_tup.clone(),parms)));
+		axum::Server::bind(&http_addr).serve(app.into_make_service_with_connect_info::<SocketAddr>()).with_graceful_shutdown(shutdown_signal()).await.unwrap();
 	});
 }
 
 async fn get_file(
-	axum::extract::Path(_path):axum::extract::Path<String>,
+	_path:Option<axum::extract::Path<String>>,
 	client_headers:axum::http::HeaderMap,
 	(client,config,dummy_img,fontdb):(reqwest::Client,Arc<ConfigFile>,Arc<Vec<u8>>,Arc<resvg::usvg::fontdb::Database>),
 	axum::extract::Query(q):axum::extract::Query<RequestParams>,
 )->Result<(axum::http::StatusCode,axum::headers::HeaderMap,StreamBody<impl futures::Stream<Item = Result<axum::body::Bytes, reqwest::Error>>>),axum::response::Response>{
+	println!("{}\t{}\tavatar:{:?}\tpreview:{:?}\tbadge:{:?}\temoji:{:?}\tstatic:{:?}\tfallback:{:?}",
+		chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+		q.url,
+		q.avatar,
+		q.preview,
+		q.badge,
+		q.emoji,
+		q.r#static,
+		q.fallback,
+	);
 	let mut headers=axum::headers::HeaderMap::new();
-	headers.append("X-Remote-Url",q.url.parse().unwrap());
+	if let Ok(url)=q.url.parse(){
+		headers.append("X-Remote-Url",url);
+	}
 	if config.encode_avif{
 		headers.append("Vary","Accept,Range".parse().unwrap());
 	}
 	let req=client.get(&q.url);
 	let req=req.timeout(std::time::Duration::from_millis(config.timeout));
-	let req=req.header("UserAgent",config.user_agent.clone());
+	let req=req.header("User-Agent",config.user_agent.clone());
 	let req=if let Some(range)=client_headers.get("Range"){
 		req.header("Range",range.as_bytes())
 	}else{
@@ -194,7 +241,7 @@ async fn get_file(
 		parms:q,
 		src_bytes:Vec::new(),
 		config,
-		codec:None,
+		codec:Err(None),
 		dummy_img,
 		fontdb,
 	}.encode(resp,is_img).await
@@ -205,7 +252,7 @@ struct RequestContext{
 	parms:RequestParams,
 	src_bytes:Vec<u8>,
 	config:Arc<ConfigFile>,
-	codec:Option<image::ImageFormat>,
+	codec:Result<image::ImageFormat,Option<image::ImageError>>,
 	dummy_img:Arc<Vec<u8>>,
 	fontdb:Arc<resvg::usvg::fontdb::Database>,
 }
@@ -283,18 +330,14 @@ impl RequestContext{
 				is_svg=true;
 			}
 		}
-		if !is_svg&&!is_img{
-			if let Some(cd)=self.headers.get("Content-Disposition"){
-				let s=std::str::from_utf8(cd.as_bytes());
-				if let Ok(s)=s{
-					for e in s.split(";"){
-						if e.starts_with("filename"){
-							if e.contains(".svg"){
-								is_svg=true;
-							}
-						}
-					}
-				}
+		let status=resp.status();
+		let resp=PreDataStream::new(resp).await;
+		if let Some(Ok(head))=resp.head.as_ref(){
+			//utf8にパースできて空白文字を削除した後の先頭部分が<svgの場合はsvg
+			if std::str::from_utf8(&head).map(|s|s.trim().starts_with("<svg")).unwrap_or(false){
+				is_svg=true;
+			}else{
+				self.codec=image::guess_format(head).map_err(|e|Some(e));
 			}
 		}
 		if is_svg{
@@ -309,7 +352,10 @@ impl RequestContext{
 			}else{
 				return Err((axum::http::StatusCode::OK,self.headers.clone(),self.src_bytes.clone()).into_response());
 			}
-		}else if is_img{
+		}else if is_img||self.codec.is_ok(){
+			self.headers.remove("Content-Length");
+			self.headers.remove("Content-Range");
+			self.headers.remove("Accept-Ranges");
 			self.load_all(resp).await?;
 			let resp=self.encode_img();
 			if self.parms.fallback.is_some(){
@@ -333,8 +379,7 @@ impl RequestContext{
 				Self::disposition_ext(&mut self.headers,".unknown");
 			}
 		}
-		let status=resp.status();
-		let body=StreamBody::new(resp.bytes_stream());
+		let body=StreamBody::new(resp);
 		if status.is_success(){
 			self.headers.remove("Cache-Control");
 			self.headers.append("Cache-Control","max-age=31536000, immutable".parse().unwrap());
@@ -344,24 +389,33 @@ impl RequestContext{
 				Ok((axum::http::StatusCode::OK,self.headers.clone(),body))
 			}
 		}else{
+			self.headers.append("X-Proxy-Error",format!("status:{}",status.as_u16()).parse().unwrap());
 			Err(if self.parms.fallback.is_some(){
 				self.headers.remove("Content-Type");
 				self.headers.append("Content-Type","image/png".parse().unwrap());
 				(axum::http::StatusCode::OK,self.headers.clone(),(*self.dummy_img).clone()).into_response()
 			}else{
-				axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+				let status=match status{
+					reqwest::StatusCode::BAD_REQUEST=>axum::http::StatusCode::BAD_REQUEST,
+					reqwest::StatusCode::FORBIDDEN=>axum::http::StatusCode::FORBIDDEN,
+					reqwest::StatusCode::NOT_FOUND=>axum::http::StatusCode::NOT_FOUND,
+					reqwest::StatusCode::REQUEST_TIMEOUT=>axum::http::StatusCode::GATEWAY_TIMEOUT,
+					reqwest::StatusCode::GONE=>axum::http::StatusCode::GONE,
+					reqwest::StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS=>axum::http::StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS,
+					_=>axum::http::StatusCode::BAD_GATEWAY,
+				};
+				(status,self.headers.clone()).into_response()
 			})
 		}
 	}
-	async fn load_all(&mut self,resp: reqwest::Response)->Result<(),axum::response::Response>{
-		let len_hint=resp.content_length().unwrap_or(2048.min(self.config.max_size));
+	async fn load_all(&mut self,mut resp: PreDataStream)->Result<(),axum::response::Response>{
+		let len_hint=resp.content_length.unwrap_or(2048.min(self.config.max_size));
 		if len_hint>self.config.max_size{
 			self.headers.append("X-Proxy-Error",format!("lengthHint:{}>{}",len_hint,self.config.max_size).parse().unwrap());
 			return Err((axum::http::StatusCode::BAD_GATEWAY,self.headers.clone()).into_response())
 		}
 		let mut response_bytes=Vec::with_capacity(len_hint as usize);
-		let mut stream=resp.bytes_stream();
-		while let Some(x) = stream.next().await{
+		while let Some(x) = resp.next().await{
 			match x{
 				Ok(b)=>{
 					if response_bytes.len()+b.len()>self.config.max_size as usize{
@@ -378,5 +432,33 @@ impl RequestContext{
 		}
 		self.src_bytes=response_bytes;
 		Ok(())
+	}
+}
+struct PreDataStream{
+	content_length:Option<u64>,
+	head:Option<Result<axum::body::Bytes, reqwest::Error>>,
+	last:Pin<Box<dyn futures::stream::Stream<Item=Result<axum::body::Bytes, reqwest::Error>>+Send+Sync>>,
+}
+impl  PreDataStream{
+	async fn new(value: reqwest::Response) -> Self {
+		let content_length=value.content_length();
+		let mut stream=value.bytes_stream();
+		let head=stream.next().await;
+		Self{
+			content_length,
+			head,
+			last: Box::pin(stream)
+		}
+	}
+}
+impl futures::stream::Stream for PreDataStream{
+	type Item=Result<axum::body::Bytes, reqwest::Error>;
+
+	fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
+		let mut r=self.as_mut();
+		if let Some(d)=r.head.take(){
+			return std::task::Poll::Ready(Some(d));
+		}
+		r.last.as_mut().poll_next(cx)
 	}
 }

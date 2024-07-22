@@ -23,13 +23,13 @@ impl RequestContext{
 		}
 		(self.config.max_pixels,self.config.max_pixels)
 	}
-	pub(crate) fn resize(&self,img:DynamicImage)->DynamicImage{
+	pub(crate) fn resize(&self,img:DynamicImage)->Option<DynamicImage>{
 		let (width,height)=self.image_size_hint();
 		if self.parms.badge.is_some(){
 			let img=if img.dimensions()==(width,height){
 				img
 			}else{
-				img.resize(width,height,self.config.filter_type.into())
+				resize(img,width,height,self.config.filter_type.into())?
 			};
 			let img=img.into_luma8();
 			let mut canvas=image::GrayAlphaImage::new(width,height);
@@ -46,27 +46,24 @@ impl RequestContext{
 				}
 				y+=1;
 			}
-			return DynamicImage::ImageLumaA8(canvas);
+			return Some(DynamicImage::ImageLumaA8(canvas));
 		}
 		let max_width=width.min(img.width());
 		let max_height=height.min(img.height());
 		let filter=self.config.filter_type.into();
 		if img.dimensions()==(max_width,max_height){
-			return img;
+			return Some(img);
 		}
-		let img=img.resize(max_width,max_height,filter);
-		img
+		resize(img,max_width,max_height,filter)
 	}
 	pub(crate) fn encode_img(&mut self)->axum::response::Response{
-		let codec=image::guess_format(&self.src_bytes);
-		self.codec=codec.as_ref().ok().copied();
 		if self.parms.r#static.is_some(){
 			return self.encode_single();
 		}
 		if self.parms.badge.is_some(){
 			return self.encode_single();
 		}
-		let codec=match codec{
+		let codec=match &self.codec{
 			Ok(codec) => codec,
 			Err(e) => {
 				self.headers.append("X-Proxy-Error",format!("CodecError:{:?}",e).parse().unwrap());
@@ -99,7 +96,38 @@ impl RequestContext{
 					Err(_)=>return self.encode_single()
 				};
 				if a.has_animation(){
-					self.encode_anim(a.into_frames())
+					let decoder=webp::AnimDecoder::new(&self.src_bytes);
+					if let Ok(mut dec)=decoder.decode(){
+						let mut offset=0;
+						let mut frames=vec![];
+						dec.sort_by_time_stamp();
+						for frame in dec.into_iter(){
+							let img=if frame.get_layout().is_alpha() {
+								let image =
+									image::ImageBuffer::from_raw(frame.width(), frame.height(), frame.get_image().to_owned())
+										.expect("ImageBuffer couldn't be created");
+								image
+							} else {
+								let image =
+									image::ImageBuffer::from_raw(frame.width(), frame.height(), frame.get_image().to_owned())
+										.expect("ImageBuffer couldn't be created");
+								DynamicImage::ImageRgb8(image).into_rgba8()
+							};
+							let delay=frame.get_time_ms()-offset;
+							offset=frame.get_time_ms();
+							if delay<0{
+								continue;
+							}
+							let delay=std::time::Duration::from_millis(delay as u64);
+							let delay=image::Delay::from_saturating_duration(delay);
+							let frame=image::Frame::from_parts(img,0,0,delay);
+							frames.push(Ok(frame));
+						}
+						let frames=image::Frames::new(Box::new(frames.into_iter()));
+						self.encode_anim(frames)
+					}else{
+						self.encode_anim(a.into_frames())
+					}
 				}else{
 					self.encode_single()
 				}
@@ -115,11 +143,22 @@ impl RequestContext{
 		let mut size:Option<(u32, u32)>=None;
 		{
 			let mut timestamp=0;
+			const FRAMES_LIMIT:u32=1000;
+			let mut allow_frames=FRAMES_LIMIT;
 			for frame in frames{
+				allow_frames-=1;
+				if allow_frames==0{
+					let mut headers=self.headers.clone();
+					headers.append("X-Proxy-Error",format!("FramesLimit {}",FRAMES_LIMIT).parse().unwrap());
+					return (axum::http::StatusCode::BAD_GATEWAY,headers).into_response();
+				}
 				if let Ok(frame)=frame{
 					timestamp+=std::time::Duration::from(frame.delay()).as_millis() as i32;
 					let img=image::DynamicImage::ImageRgba8(frame.into_buffer());
-					let img=self.resize(img);
+					let img=match self.resize(img){
+						Some(img)=>img,
+						None=>return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+					};
 					if let Some(size)=size{
 						if size.0==img.width()&&size.1==img.height(){
 							//ok
@@ -130,6 +169,8 @@ impl RequestContext{
 						size=Some((img.width(),img.height()));
 					}
 					image_buffer.push((img,timestamp));
+				}else{
+					break;
 				}
 			}
 		}
@@ -171,12 +212,15 @@ impl RequestContext{
 	}
 	pub(crate) fn response_img(&mut self,img:DynamicImage)->axum::response::Response{
 		let img=match self.codec{
-			Some(image::ImageFormat::Jpeg)|Some(image::ImageFormat::Tiff)=>{
+			Ok(image::ImageFormat::Jpeg)|Ok(image::ImageFormat::Tiff)=>{
 				self.exif_rotate(img)
 			},
 			_=>img
 		};
-		let img=self.resize(img);
+		let img=match self.resize(img){
+			Some(img)=>img,
+			None=>return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+		};
 		let mut buf=vec![];
 		self.headers.remove("Content-Type");
 		let format=if self.parms.badge.is_some(){
@@ -266,4 +310,27 @@ pub fn image_to_frame(image: &DynamicImage, timestamp: i32) -> Result<webp::Anim
 		)),
 		_ => Err("Unimplemented"),
 	}
+}
+fn resize(img:DynamicImage,max_width:u32,max_height:u32,filter:fast_image_resize::FilterType)->Option<DynamicImage>{
+	let scale = f32::min(max_width as f32 / img.width() as f32,max_height as f32 / img.height() as f32);
+	let dst_width=1.max((img.width() as f32 * scale).round() as u32);
+	let dst_height=1.max((img.height() as f32 * scale).round() as u32);
+	use std::num::NonZeroU32;
+	let width=NonZeroU32::new(img.width())?;
+	let height=NonZeroU32::new(img.height())?;
+	let src_image=fast_image_resize::Image::from_vec_u8(width,height,img.into_rgba8().into_raw(),fast_image_resize::PixelType::U8x4);
+	let mut src_image=src_image.ok()?;
+	let alpha_mul_div=fast_image_resize::MulDiv::default();
+	alpha_mul_div.multiply_alpha_inplace(&mut src_image.view_mut()).ok()?;
+	let dst_width=NonZeroU32::new(dst_width)?;
+	let dst_height=NonZeroU32::new(dst_height)?;
+	let mut dst_image = fast_image_resize::Image::new(dst_width,dst_height,src_image.pixel_type());
+	let mut dst_view = dst_image.view_mut();
+	let mut resizer = fast_image_resize::Resizer::new(
+		fast_image_resize::ResizeAlg::Convolution(filter),
+	);
+	resizer.resize(&src_image.view(), &mut dst_view).ok()?;
+	alpha_mul_div.divide_alpha_inplace(&mut dst_view).ok()?;
+	let rgba=image::RgbaImage::from_raw(dst_image.width().get(),dst_image.height().get(),dst_image.into_vec());
+	Some(DynamicImage::ImageRgba8(rgba?))
 }
