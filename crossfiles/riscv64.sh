@@ -5,4 +5,4 @@ export CXX=riscv64-linux-musl-g++
 export AR=riscv64-linux-musl-ar
 export RUSTFLAGS="-C linker=${CC} "
 export PKG_CONFIG_SYSROOT_DIR="/musl/${MUSL_NAME}/"
-export RUST_TARGET="riscv64gc-unknown-linux-gnu"
+export RUST_TARGET="riscv64gc-unknown-linux-musl"
