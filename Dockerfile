@@ -1,11 +1,6 @@
 FROM alpine:latest AS dav1d
-RUN apk add --no-cache clang musl-dev meson ninja pkgconfig nasm git
-RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d_src
-WORKDIR /dav1d_src
-RUN meson build -Dprefix=/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release
-RUN ninja -C build
-RUN ninja -C build install
-RUN rm -r /dav1d_src
+COPY dav1d_build.sh /dav1d_build.sh
+RUN --mount=type=cache,target=/dav1d_bin sh /dav1d_build.sh
 
 FROM --platform=$BUILDPLATFORM rust:alpine AS build_base
 ARG BUILDARCH
