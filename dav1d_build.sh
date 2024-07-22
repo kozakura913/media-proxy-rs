@@ -12,6 +12,3 @@ ninja -C build
 ninja -C build install
 rm -r /dav1d_src
 cp -r /dav1d/lib /dav1d_bin/lib
-mv /dav1d/lib /temp_dav1d
-rm -r /dav1d
-mv /temp_dav1d /dav1d/lib
