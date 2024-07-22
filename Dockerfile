@@ -22,7 +22,6 @@ WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY .gitmodules ./.gitmodules
 COPY image-rs ./image-rs
-RUN git submodule update --init
 COPY --from=0 /dav1d /dav1d
 COPY src ./src
 COPY Cargo.toml ./Cargo.toml
