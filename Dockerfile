@@ -10,7 +10,7 @@ RUN git clone -b "v1.4.0" --depth 1 "https://chromium.googlesource.com/webm/libw
 RUN mkdir /heif
 RUN mkdir build_libwebp && cd build_libwebp
 RUN cmake ../libwebp -DBUILD_SHARED_LIBS=false -DCMAKE_BUILD_TYPE=Release
-RUN make
+RUN make -j $(nproc)
 RUN cmake --install . --prefix /heif
 
 FROM c_build_base AS libde265
@@ -18,7 +18,7 @@ RUN git clone -b "v1.0.15" --depth 1 "https://github.com/strukturag/libde265"
 RUN mkdir build_libde265 && cd build_libde265
 ENV CC=clang
 RUN cmake ../libde265 -DBUILD_SHARED_LIBS=false -DENABLE_DECODER=false -D_GLIBCXX_USE_CXX11_ABI=1 -DCMAKE_CXX_STANDARD=20
-RUN make
+RUN make -j $(nproc)
 RUN cmake --install . --prefix /heif
 
 FROM c_build_base AS heif
@@ -28,7 +28,7 @@ COPY --from=libde265 /heif /heif
 RUN mkdir build_libheif && cd build_libheif
 RUN cmake ../libheif -DWITH_OpenJPEG_DECODER=false -DWITH_OpenJPEG_ENCODER=false -DWITH_LIBSHARPYUV=true -DWITH_AOM_DECODER=false -DWITH_AOM_ENCODER=false -DWITH_X265=false -DWITH_OpenH264_DECODER=false -DBUILD_SHARED_LIBS=false \
  -DLIBDE265_INCLUDE_DIR=/heif/include -DLIBDE265_LIBRARY=/heif/lib/libde265.a -DLIBSHARPYUV_INCLUDE_DIR=/heif/include/webp -DLIBSHARPYUV_LIBRARY=/heif/lib/libsharpyuv.a -DCMAKE_INSTALL_PREFIX=/heif
-RUN make
+RUN make -j $(nproc)
 RUN cmake --install . --prefix /heif
 
 FROM --platform=$BUILDPLATFORM rust:alpine AS build_base
@@ -45,7 +45,7 @@ RUN --mount=type=cache,target=/musl sh /app/crossfiles/deps.sh
 WORKDIR /app
 COPY --from=heif /heif /heif
 ENV LIBHEIF_LIBS_DIR=/heif/lib
-ENV LIBHEIF_LINK_CXX=dylib
+ENV LIBHEIF_LINK_CXX=dynamic
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY .gitmodules ./.gitmodules
 COPY image-rs ./image-rs
