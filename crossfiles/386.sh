@@ -11,3 +11,4 @@ export AR=i686-linux-musl-ar
 export RUSTFLAGS="-C target-feature=+sse -C target-feature=+sse2 -C linker=${CC}"
 export PKG_CONFIG_SYSROOT_DIR="/musl/${MUSL_NAME}/"
 export RUST_TARGET="i686-unknown-linux-musl"
+export STDC_LIBS="/musl/${MUSL_NAME}/i686-linux-musl/lib"

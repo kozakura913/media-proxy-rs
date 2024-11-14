@@ -19,13 +19,18 @@
 ## ビルド(x64/aarch64 Docker)
 Dockerを使用する場合はbuildxとqemuによるクロスコンパイルが利用できます  
 ビルド対象プラットフォームはtarget supportの項目を参照してください
+Dockerビルドで生成されるバイナリはmuslとstdc++に依存します
 1. `git clone --recursive https://github.com/yojo-art/media-proxy-rs && cd media-proxy-rs`
 2. `docker build -t media-proxy-rs .`
 
 ## ビルド(x64 Debian系)
 この方法では`x86_64-unknown-linux-gnu`向けにビルドします  
-すべてを静的に組み込むmusl系とは異なる共有ライブラリを必要とする場合があります
+musl系とは異なる共有ライブラリを必要とする場合があります
 1. https://www.rust-lang.org/ja/tools/install に従ってrustをインストール
-1. `apt-get install -y meson ninja-build pkg-config nasm git`
-2. `git clone --recursive https://github.com/yojo-art/media-proxy-rs && cd media-proxy-rs`
-3. `cargo build --release`
+2. `apt-get install -y meson ninja-build pkg-config nasm git clang cmake`
+3. `git clone --recursive https://github.com/yojo-art/media-proxy-rs && cd media-proxy-rs`
+4. `cargo build --release`
+
+#License
+このプロジェクトのライセンスはLICENSEファイルに従います
+依存関係にLGPLv3のプロジェクトを含むため、ビルド済バイナリはLGPLv3で配布されます

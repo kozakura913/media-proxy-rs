@@ -201,6 +201,8 @@ impl RequestContext{
 	}
 	fn encode_single(&mut self)->axum::response::Response{
 		let img=match &self.codec{
+			#[cfg(feature="heif")]
+			Ok(image::ImageFormat::Heif)=>crate::heif::decode_heif(&self.src_bytes).map(|img|DynamicImage::ImageRgba8(img)),
 			Ok(codec)=>image::load_from_memory_with_format(&self.src_bytes,*codec).map_err(|e|format!("{:?}",e)),
 			Err(Some(e))=>Err(format!("{:?}",e)),
 			_=>{
