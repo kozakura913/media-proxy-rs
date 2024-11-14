@@ -45,7 +45,7 @@ RUN --mount=type=cache,target=/musl sh /app/crossfiles/deps.sh
 WORKDIR /app
 COPY --from=heif /heif /heif
 ENV LIBHEIF_LIBS_DIR=/heif/lib
-ENV LIBHEIF_LINK_CXX=none
+ENV LIBHEIF_LINK_CXX=dylib
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY .gitmodules ./.gitmodules
 COPY image-rs ./image-rs
