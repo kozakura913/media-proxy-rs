@@ -1,9 +1,5 @@
 set -eu
-if [ -f "/app/crossfiles/${TARGETARCH}.sh" ]; then
-	source /app/crossfiles/${TARGETARCH}.sh
-else
-	source /app/crossfiles/${TARGETARCH}/${TARGETVARIANT}.sh
-fi
+source /app/crossfiles/autoenv.sh
 rustup target add ${RUST_TARGET}
 if [ -d "/musl/${MUSL_NAME}" ]; then
 	:

@@ -28,8 +28,8 @@ rexif = "0.7"
 avif-decoder_dep = { path="./avif-decoder_dep" ,optional = true }
 chrono = "0.4"
 fast_image_resize = "3.0"
-libheif-rs-static = { git = "https://github.com/kozakura913/libheif-rs-static.git", rev="a888cdaa7a21f6c111f711e0df58deb73879da3b" ,optional = true }
-#libheif-rs-static = { path = "libheif-rs-static" ,optional = true }
+#libheif-rs-static = { git = "https://github.com/kozakura913/libheif-rs-static.git", rev="a888cdaa7a21f6c111f711e0df58deb73879da3b" ,optional = true }
+libheif-rs-static = { path = "./libheif-rs-static" ,optional = true }
 
 [profile.release]
 strip = true

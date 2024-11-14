@@ -1,3 +1,6 @@
 [submodule "image-rs"]
 	path = image-rs
 	url = https://github.com/kozakura913/image.git
+[submodule "libheif-rs-static"]
+	path = libheif-rs-static
+	url = https://github.com/kozakura913/libheif-rs-static.git
