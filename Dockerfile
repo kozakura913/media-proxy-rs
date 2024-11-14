@@ -35,6 +35,8 @@ FROM --platform=$BUILDPLATFORM rust AS bindgen
 RUN cargo install bindgen-cli@0.70.1
 RUN apt-get update && apt-get install -y clang git
 COPY --from=heif /heif /heif
+RUN rm -r /usr/include
+COPY --from=heif /usr/include /usr/include
 COPY crossfiles /app/crossfiles
 ARG BUILDARCH
 ARG TARGETARCH
