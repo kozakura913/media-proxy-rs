@@ -41,7 +41,7 @@ COPY crossfiles /app/crossfiles
 ARG BUILDARCH
 ARG TARGETARCH
 ARG TARGETVARIANT
-RUN bash -c "source /app/crossfiles/autoenv.sh && bindgen --output /heif/libheif.rs /heif/include/libheif/heif.h -- -I /heif/include --target=\${RUST_TARGET}"
+RUN bash -c "source /app/crossfiles/autoenv.sh && bindgen --formatter=prettyplease --output /heif/libheif.rs /heif/include/libheif/heif.h -- -I /heif/include --target=\${RUST_TARGET}"
 
 FROM --platform=$BUILDPLATFORM rust:alpine AS build_base
 ARG BUILDARCH
@@ -70,7 +70,9 @@ COPY libheif-rs-static ./libheif-rs-static
 RUN rm ./libheif-rs-static/src/libheif.rs
 #bindgenをターゲットアーキテクチャ用に差し替える
 COPY --from=bindgen /heif/libheif.rs ./libheif-rs-static/src/libheif.rs
-RUN --mount=type=cache,target=/var/cache/cargo --mount=type=cache,target=/app/target --mount=type=cache,target=/musl sh /app/crossfiles/build.sh
+#bindgen --formatter=prettypleaseが変なの生成するから訂正
+RUN sed -i "s/\*\// \*\//g" ./libheif-rs-static/src/libheif.rs
+RUN --mount=type=cache,target=/var/cache/cargo --mount=type=cache,target=/app/target --mount=type=cache,target=/musl sh -c "cat ./libheif-rs-static/src/libheif.rs && sh /app/crossfiles/build.sh"
 
 FROM alpine:latest
 #FROM rust:alpine
