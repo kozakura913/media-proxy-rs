@@ -65,7 +65,3 @@ pub fn decode_heif(bin:&[u8])->Result<RgbaImage,String>{
 	};
 	image::RgbaImage::from_raw(width as u32,height as u32,rgb_pix).ok_or_else(||"RgbImage::from_raw None".to_owned())
 }
-pub fn main(){
-	let bin=include_bytes!("test.heic");
-	image::DynamicImage::ImageRgba8(decode_heif(bin).unwrap()).save("test.png");
-}
