@@ -6,7 +6,7 @@ echo "[target.${RUST_TARGET}]" >> ./.cargo/config.toml
 echo 'rustflags = ["-C", "link-args=-Wl,-lc"]' >> ./.cargo/config.toml
 cargo build --release --target ${RUST_TARGET}
 cargo build --release --target ${RUST_TARGET} --example healthcheck
-cp /app/target/${RUST_TARGET}/debug/media-proxy-rs /app/media-proxy-rs
+cp /app/target/${RUST_TARGET}/release/media-proxy-rs /app/media-proxy-rs
 cp /app/target/${RUST_TARGET}/release/examples/healthcheck /app/healthcheck
 mkdir /app/libs
 cp ${STDC_LIBS}/libstdc++.so* /app/libs
