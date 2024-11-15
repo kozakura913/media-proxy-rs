@@ -50,7 +50,7 @@ COPY crossfiles /app/crossfiles
 ARG BUILDARCH
 ARG TARGETARCH
 ARG TARGETVARIANT
-RUN bash -c "source /app/crossfiles/autoenv.sh && bindgen --formatter=prettyplease --output /heif/libheif.rs /heif/include/libheif/heif.h -- -I /heif/include --target=\${RUST_TARGET}"
+RUN bash -c "source /app/crossfiles/autoenv.sh && bindgen --disable-name-namespacing --formatter=rustfmt --allowlist-function heif_.* --allowlist-type heif_.* --output /heif/libheif.rs /heif/include/libheif/heif.h -- -I /heif/include --target=\${RUST_TARGET} -fparse-all-comments -fretain-comments-from-system-headers"
 
 FROM cross_build_base AS build_app
 ENV PKG_CONFIG_PATH=/dav1d/lib/pkgconfig
@@ -76,7 +76,7 @@ RUN rm ./libheif-rs-static/src/libheif.rs
 #bindgenをターゲットアーキテクチャ用に差し替える
 COPY --from=bindgen /heif/libheif.rs ./libheif-rs-static/src/libheif.rs
 #bindgen --formatter=prettypleaseが変なの生成するから訂正
-RUN sed -i "s/\*\// \*\//g" ./libheif-rs-static/src/libheif.rs
+#RUN sed -i "s/\*\// \*\//g" ./libheif-rs-static/src/libheif.rs
 RUN --mount=type=cache,target=/var/cache/cargo --mount=type=cache,target=/app/target --mount=type=cache,target=/musl sh -c "cat ./libheif-rs-static/src/libheif.rs && sh /app/crossfiles/build.sh"
 
 FROM alpine:latest
