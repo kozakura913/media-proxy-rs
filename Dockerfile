@@ -1,8 +1,6 @@
 FROM alpine:latest AS dav1d
 COPY dav1d_build.sh /dav1d_build.sh
 RUN --mount=type=cache,target=/dav1d_bin sh /dav1d_build.sh
-#WIP
-RUN ldd /dav1d/lib/libdav1d.a && exit 1
 
 FROM --platform=$BUILDPLATFORM rust:alpine AS build_base
 ARG BUILDARCH
