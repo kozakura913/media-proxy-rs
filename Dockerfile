@@ -2,7 +2,7 @@ FROM alpine:latest AS dav1d
 COPY dav1d_build.sh /dav1d_build.sh
 RUN --mount=type=cache,target=/dav1d_bin sh /dav1d_build.sh
 
-FROM --platform=$BUILDPLATFORM rust:alpine AS build_base
+FROM --platform=$BUILDPLATFORM rust AS build_base
 ARG BUILDARCH
 ARG TARGETARCH
 ARG TARGETVARIANT
