@@ -12,9 +12,3 @@ cargo build --release --target ${RUST_TARGET}
 cargo build --release --target ${RUST_TARGET} --example healthcheck
 cp /app/target/${RUST_TARGET}/release/media-proxy-rs /app/media-proxy-rs
 cp /app/target/${RUST_TARGET}/release/examples/healthcheck /app/healthcheck
-mkdir wip
-cd wip
-cargo init
-cargo build --release --target ${RUST_TARGET}
-cp /app/wip/target/${RUST_TARGET}/release/wip /app/wip_bin
-cd ..
