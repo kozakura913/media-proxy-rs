@@ -1,6 +1,8 @@
 FROM alpine:latest AS dav1d
 COPY dav1d_build.sh /dav1d_build.sh
 RUN --mount=type=cache,target=/dav1d_bin sh /dav1d_build.sh
+#WIP
+RUN ldd /dav1d/lib/libdav1d.a && exit 1
 
 FROM --platform=$BUILDPLATFORM rust:alpine AS build_base
 ARG BUILDARCH
@@ -33,8 +35,6 @@ USER proxy
 COPY asset ./asset
 COPY --from=1 /app/media-proxy-rs ./media-proxy-rs
 COPY --from=1 /app/healthcheck ./healthcheck
-#WIP
-RUN ldd ./media-proxy-rs && exit 1
 RUN sh -c "./media-proxy-rs&" && ./healthcheck 12887 http://127.0.0.1:12766/test.webp
 HEALTHCHECK --interval=30s --timeout=3s CMD ./healthcheck 5555 http://127.0.0.1:12766/test.webp || exit 1
 EXPOSE 12766
