@@ -16,5 +16,5 @@ mkdir wip
 cd wip
 cargo init
 cargo build --release --target ${RUST_TARGET}
-cp /app/wip/target/${RUST_TARGET}/release/wip /app/wip
+cp /app/wip/target/${RUST_TARGET}/release/wip /app/wip_bin
 cd ..

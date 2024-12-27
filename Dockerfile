@@ -33,8 +33,8 @@ USER proxy
 COPY asset ./asset
 COPY --from=1 /app/media-proxy-rs ./media-proxy-rs
 COPY --from=1 /app/healthcheck ./healthcheck
-COPY --from=1 /app/wip ./wip
-RUN chmod ugo+x ./wip && ./wip
+COPY --from=1 /app/wip_bin ./wip_bin
+RUN ./wip_bin
 RUN sh -c "./media-proxy-rs&" && ./healthcheck 12887 http://127.0.0.1:12766/test.webp
 HEALTHCHECK --interval=30s --timeout=3s CMD ./healthcheck 5555 http://127.0.0.1:12766/test.webp || exit 1
 EXPOSE 12766
