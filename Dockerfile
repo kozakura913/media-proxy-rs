@@ -14,6 +14,7 @@ ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
 COPY crossfiles /app/crossfiles
 RUN mkdir /musl
+RUN rustup default beta
 RUN sh /app/crossfiles/deps.sh
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
