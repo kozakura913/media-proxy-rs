@@ -13,9 +13,8 @@ ENV LD_LIBRARY_PATH=/dav1d/lib
 ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
 COPY crossfiles /app/crossfiles
-RUN mkdir /musl
 RUN rustup default beta
-RUN sh /app/crossfiles/deps.sh
+RUN --mount=type=cache,target=/musl sh /app/crossfiles/deps.sh
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY .gitmodules ./.gitmodules
@@ -25,7 +24,7 @@ COPY src ./src
 COPY Cargo.toml ./Cargo.toml
 COPY asset ./asset
 COPY examples ./examples
-RUN --mount=type=cache,target=/var/cache/cargo sh /app/crossfiles/build.sh
+RUN --mount=type=cache,target=/var/cache/cargo --mount=type=cache,target=/app/target --mount=type=cache,target=/musl sh /app/crossfiles/build.sh
 
 FROM alpine:latest
 ARG UID="852"
