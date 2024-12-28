@@ -100,7 +100,7 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }},dest=/tmp/app.tar
           cache-from: type=gha
           cache-to: type=gha,mode=min
 
@@ -112,6 +112,7 @@ jobs:
 
       - name: Image List
         run: |
+          docker load --input /tmp/app.tar
           docker image ls
 
       - name: Upload digest
