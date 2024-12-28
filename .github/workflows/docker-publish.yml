@@ -111,6 +111,7 @@ jobs:
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Inspect
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
@@ -123,12 +124,14 @@ jobs:
           retention-days: 1
 
       - name: Extract Application
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           mkdir /tmp/app/
           docker run --rm -t -v /tmp/app:/tmp/app ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }} cp /media-proxy-rs/media-proxy-rs /tmp/app/
 
       - name: Upload Application
         uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'pull_request' }}
         with:
           name: ${{ env.REGISTRY_IMAGE }}_${{ env.PLATFORM_PAIR }}
           path: /tmp/app/*
