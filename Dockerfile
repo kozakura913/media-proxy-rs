@@ -53,7 +53,7 @@ ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
-RUN --from=debian /lib /debian
+RUN --from=libclang /lib /debian
 COPY .gitmodules ./.gitmodules
 COPY --from=heif /heif/lib/pkgconfig /pkgconfig
 COPY --from=dav1d /dav1d/lib/pkgconfig /pkgconfig
