@@ -1,6 +1,6 @@
 FROM debian AS libclang
 RUN apt-get update && apt-get install -y libclang-dev
-RUN sh -c "find /* | grep \"*libclang*\"" && exit 1
+RUN mkdir /libclang && cp /lib/clang/*/lib/linux/libclang*.so /libclang
 
 FROM alpine:latest AS c_build_base
 RUN apk add --no-cache clang clang17-libclang musl-dev meson ninja pkgconfig nasm git cmake make
@@ -53,13 +53,13 @@ ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
-COPY --from=libclang /lib /debian
+COPY --from=libclang /libclang /libclang
+ENV LIBCLANG_PATH=/libclang
 COPY .gitmodules ./.gitmodules
 COPY --from=heif /heif/lib/pkgconfig /pkgconfig
 COPY --from=dav1d /dav1d/lib/pkgconfig /pkgconfig
 COPY --from=heif /heif /heif
 COPY --from=dav1d /dav1d /dav1d
-RUN exit 1
 COPY src ./src
 COPY Cargo.toml ./Cargo.toml
 COPY asset ./asset
