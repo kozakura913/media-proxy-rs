@@ -43,16 +43,18 @@ RUN make -j $(nproc)
 RUN cmake --install . --prefix /heif
 
 FROM cross_build_base AS build_app
-ENV PKG_CONFIG_PATH=/dav1d/lib/pkgconfig
+ENV PKG_CONFIG_PATH=/pkgconfig
 ENV LD_LIBRARY_PATH=/dav1d/lib
 ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY .gitmodules ./.gitmodules
+COPY --from=heif /heif/lib/pkgconfig /pkgconfig
+COPY --from=dav1d /dav1d/lib/pkgconfig /pkgconfig
 COPY --from=heif /heif /heif
 COPY --from=dav1d /dav1d /dav1d
-RUN find /heif/* && exit 1
+#RUN find /heif/* && exit 1
 COPY src ./src
 COPY Cargo.toml ./Cargo.toml
 COPY asset ./asset
