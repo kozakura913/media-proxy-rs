@@ -107,10 +107,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=min
           push: true
-          tags: localhost:5000/media-proxy-rs:latest
+          tags: localhost:5000/media-proxy-rs
       - name: Inspect
         run: |
-          docker buildx imagetools inspect localhost:5000/media-proxy-rs:latest
+          docker buildx imagetools inspect localhost:5000/media-proxy-rs
 
       - name: Export digest
         run: |
@@ -132,7 +132,7 @@ jobs:
       - name: Download digests
         run: |
           mkdir /tmp/app/
-          docker run --rm -t -v /tmp/app:/tmp/app localhost:5000/media-proxy-rs:latest cp /media-proxy-rs/media-proxy-rs /tmp/app/
+          docker run --rm -t -v /tmp/app:/tmp/app localhost:5000/media-proxy-rs cp /media-proxy-rs/media-proxy-rs /tmp/app/
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
