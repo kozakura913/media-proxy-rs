@@ -1,6 +1,7 @@
 FROM debian AS libclang
-RUN apt-get update && apt-get install -y libclang-dev
-RUN mkdir /libclang && cp /lib/clang/*/lib/linux/libclang*.so /libclang
+RUN apt-get update && apt-get -y install lsb-release wget software-properties-common gnupg g++
+RUN bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+RUN cp /lib/clang/*/lib/linux /libclang
 
 FROM alpine:latest AS c_build_base
 RUN apk add --no-cache clang clang17-libclang musl-dev meson ninja pkgconfig nasm git cmake make
