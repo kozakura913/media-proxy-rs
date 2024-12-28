@@ -1,5 +1,5 @@
 FROM debian AS libclang
-RUN apt install libclang-dev
+RUN apt-get install -y libclang-dev
 RUN sh -c "find /* | grep \"*libclang*\"" && exit 1
 
 FROM alpine:latest AS c_build_base
