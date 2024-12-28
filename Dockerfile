@@ -1,8 +1,11 @@
+FROM debian AS libclang
+RUN apt install libclang-dev
+RUN sh -c "find /* | grep \"*libclang*\"" && exit 1
+
 FROM alpine:latest AS c_build_base
 RUN apk add --no-cache clang clang17-libclang musl-dev meson ninja pkgconfig nasm git cmake make
 
 FROM c_build_base AS dav1d
-RUN sh -c "find /* | grep \"*libclang*\"" && exit 1
 RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d_src
 RUN cd /dav1d_src && meson build -Dprefix=/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release
 RUN cd /dav1d_src && ninja -C build
@@ -50,7 +53,7 @@ ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
-RUN exit 0
+RUN --from=debian /lib /debian
 COPY .gitmodules ./.gitmodules
 COPY --from=heif /heif/lib/pkgconfig /pkgconfig
 COPY --from=dav1d /dav1d/lib/pkgconfig /pkgconfig
