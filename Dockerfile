@@ -1,5 +1,5 @@
 FROM alpine:latest AS c_build_base
-RUN apk add --no-cache clang musl-dev meson ninja pkgconfig nasm git cmake make
+RUN apk add --no-cache clang-dev musl-dev meson ninja pkgconfig nasm git cmake make
 
 FROM c_build_base AS dav1d
 RUN sh -c "find /* | grep \"*libclang*\"" && exit 1
