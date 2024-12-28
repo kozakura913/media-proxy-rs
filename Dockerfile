@@ -2,7 +2,7 @@ FROM alpine:latest AS c_build_base
 RUN apk add --no-cache clang musl-dev meson ninja pkgconfig nasm git cmake make
 
 FROM c_build_base AS dav1d
-RUN find libclang* && exit 1
+RUN sh -c "find /* | grep \"*libclang*\"" && exit 1
 RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d_src
 RUN cd /dav1d_src && meson build -Dprefix=/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release
 RUN cd /dav1d_src && ninja -C build
