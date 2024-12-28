@@ -135,7 +135,7 @@ jobs:
       - name: Extract Application
         run: |
           mkdir /tmp/app/
-          chown 852:852 /tmp/app/
+          chmod o+rwx /tmp/app/
           docker run --rm -t -v /tmp/app:/tmp/app ${{ github.repository }}:latest cp /media-proxy-rs/media-proxy-rs /tmp/app/
 
       - name: Upload Application
