@@ -95,7 +95,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: ${{ matrix.platform }}
@@ -103,7 +103,16 @@ jobs:
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
+
+      - name: Build and export to Docker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
           load: true
+          tags: ${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
 
       - name: Export digest
         run: |
@@ -126,7 +135,7 @@ jobs:
       - name: Extract Application
         run: |
           mkdir /tmp/app/
-          docker run --rm -t -v /tmp/app:/tmp/app ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }} cp /media-proxy-rs/media-proxy-rs /tmp/app/
+          docker run --rm -t -v /tmp/app:/tmp/app ${{ github.repository }}:latest cp /media-proxy-rs/media-proxy-rs /tmp/app/
 
       - name: Upload Application
         uses: actions/upload-artifact@v4
