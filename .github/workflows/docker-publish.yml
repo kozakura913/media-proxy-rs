@@ -163,6 +163,10 @@ jobs:
           - linux/arm/v6
           - linux/arm/v7
     steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
       - name: Download Application
         uses: actions/download-artifact@v4
         with:
