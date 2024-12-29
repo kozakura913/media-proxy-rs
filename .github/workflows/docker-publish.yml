@@ -147,7 +147,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Upload release
-        uses: WebFreak001/deploy-nightly@v3.1.0
+        uses: WebFreak001/deploy-nightly@v3.2.0
         with:
           upload_url: https://uploads.github.com/repos/${{ github.repository }}/releases/192614126/assets{?name,label} # find out this value by opening https://api.github.com/repos/<owner>/<repo>/releases in your browser and copy the full "upload_url" value including the {?name,label} part
           release_id: 192614126 # same as above (id can just be taken out the upload_url, it's used to find old releases)
