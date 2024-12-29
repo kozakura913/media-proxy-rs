@@ -1,5 +1,5 @@
 use core::str;
-use std::{io::{Read, Write}, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
+use std::{io::Write, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
 use axum::{body::StreamBody, http::HeaderMap, response::IntoResponse, Router};
 use serde::{Deserialize, Serialize};
@@ -122,9 +122,7 @@ fn main() {
 	}
 	let config:ConfigFile=serde_json::from_reader(std::fs::File::open(&config_path).unwrap()).unwrap();
 
-	let mut dummy_png=vec![];
-	std::fs::File::open("asset/dummy.png").expect("not found dummy.png").read_to_end(&mut dummy_png).expect("load error dummy.png");
-	let dummy_png=Arc::new(dummy_png);
+	let dummy_png=Arc::new(include_bytes!("../asset/dummy.png").to_vec());
 	let config=Arc::new(config);
 	let rt=tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
 	let client=reqwest::ClientBuilder::new();
@@ -137,7 +135,10 @@ fn main() {
 	if config.load_system_fonts{
 		fontdb.load_system_fonts();
 	}
-	fontdb.load_fonts_dir("asset/font/");
+	if std::path::Path::new("asset/font/").exists(){
+		fontdb.load_fonts_dir("asset/font/");
+	}
+	fontdb.load_font_source(resvg::usvg::fontdb::Source::Binary(Arc::new(include_bytes!("../asset/font/Aileron-Light.otf"))));
 	let fontdb=Arc::new(fontdb);
 	let arg_tup=(client,config,dummy_png,fontdb);
 	rt.block_on(async{
@@ -322,7 +323,7 @@ impl RequestContext{
 	}
 }
 impl RequestContext{
-	async fn encode(&mut self,resp: reqwest::Response,is_img:bool)->Result<(axum::http::StatusCode,axum::headers::HeaderMap,StreamBody<impl futures::Stream<Item = Result<axum::body::Bytes, reqwest::Error>>>),axum::response::Response>{
+	async fn encode(&mut self,resp: reqwest::Response,mut is_img:bool)->Result<(axum::http::StatusCode,axum::headers::HeaderMap,StreamBody<impl futures::Stream<Item = Result<axum::body::Bytes, reqwest::Error>>>),axum::response::Response>{
 		let mut is_svg=false;
 		let mut content_type=None;
 		if let Some(media)=self.headers.get("Content-Type"){
@@ -347,6 +348,16 @@ impl RequestContext{
 							"image/x-targa"|"image/x-tga"=>self.codec=Ok(image::ImageFormat::Tga),
 							_=>{}
 						}
+					}
+					if head.starts_with(&[0xFF,0x0A])||head.starts_with(&[0x00,0x00,0x00,0x0C,0x4A,0x58,0x4C,0x20,0x0D,0x0A,0x87,0x0A]){
+						is_img=true;
+						self.headers.remove("Content-Type");
+						self.headers.append("Content-Type", "image/jxl".parse().unwrap());
+					}
+					if head.starts_with(&[0xFF,0x4F,0xFF,0x51])||head.starts_with(&[0x00,0x00,0x00,0x0C,0x6A,0x50,0x20,0x20,0x0D,0x0A,0x87,0x0A]){
+						is_img=true;
+						self.headers.remove("Content-Type");
+						self.headers.append("Content-Type", "image/jp2".parse().unwrap());
 					}
 				}
 			}
