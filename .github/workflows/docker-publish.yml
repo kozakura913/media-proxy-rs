@@ -137,7 +137,6 @@ jobs:
           mkdir /tmp/app/
           chmod o+rwx /tmp/app/
           docker run --rm -t -v /tmp/app:/tmp/app ${{ github.repository }}:latest cp /media-proxy-rs/media-proxy-rs /tmp/app/
-          gzip -k /tmp/app/media-proxy-rs
 
       - name: Upload Application
         uses: actions/upload-artifact@v4
@@ -146,6 +145,35 @@ jobs:
           path: /tmp/app/media-proxy-rs
           if-no-files-found: error
           retention-days: 1
+
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    needs:
+      - build
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/386
+          - linux/amd64
+          - linux/arm64
+          - linux/arm/v6
+          - linux/arm/v7
+    steps:
+      - name: Download Application
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/app
+          pattern: media-proxy-rs_${{ env.PLATFORM_PAIR }}
+          merge-multiple: true
+      - name: gzip Application
+        working-directory: /tmp/app
+        run: |
+          ls -a ./
+          gzip -k media-proxy-rs
       - name: Upload release
         uses: WebFreak001/deploy-nightly@v3.2.0
         with:
