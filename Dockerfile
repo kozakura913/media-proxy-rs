@@ -22,14 +22,14 @@ RUN cd /lcms2_src && ./configure
 RUN cd /lcms2_src && make
 RUN cd /lcms2_src && make DESTDIR=/lcms2 install
 
-FROM --platform=$BUILDPLATFORM alpine:latest AS cross_build_base
+FROM --platform=$BUILDPLATFORM rust AS cross_build_base
 ARG BUILDARCH
 ARG TARGETARCH
 ARG TARGETVARIANT
-RUN apk add --no-cache clang musl-dev curl pkgconfig nasm git cmake make
+RUN apt-get update && apt-get install -y clang musl-dev pkg-config nasm curl git cmake make
+RUN bash /app/crossfiles/toolchain.sh
 COPY crossfiles /app/crossfiles
-RUN sh /app/crossfiles/toolchain.sh
-RUN sh /app/crossfiles/deps.sh
+RUN bash /app/crossfiles/deps.sh
 
 FROM cross_build_base AS libde265
 RUN git clone -b "v1.0.15" --depth 1 "https://github.com/strukturag/libde265"
@@ -49,16 +49,9 @@ RUN sh -c "source /app/crossfiles/autoenv.sh && \
 RUN make -j $(nproc)
 RUN cmake --install . --prefix /heif
 
-FROM --platform=$BUILDPLATFORM rust AS build_app
-ARG BUILDARCH
-ARG TARGETARCH
-ARG TARGETVARIANT
-#RUN apk add --no-cache clang musl-dev curl pkgconfig nasm mold git
-RUN apt-get update && apt-get install -y clang musl-dev pkg-config nasm mold git
+FROM cross_build_base AS build_app
 ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
-COPY crossfiles /app/crossfiles
-RUN bash /app/crossfiles/deps.sh
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
 COPY --from=dav1d /dav1d /dav1d
