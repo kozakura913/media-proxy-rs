@@ -58,6 +58,8 @@ COPY --from=dav1d /dav1d /dav1d
 COPY --from=lcms2 /lcms2 /lcms2
 COPY --from=heif /heif /heif
 RUN cp -r /lcms2/usr/local/lib/* /dav1d/lib
+RUN find /heif && exit 1
+RUN cp -r /heif/lib/* /dav1d/lib
 ENV LD_LIBRARY_PATH=/dav1d/lib
 COPY --from=heif /heif/lib/pkgconfig /pkgconfig
 COPY --from=dav1d /dav1d/lib/pkgconfig /pkgconfig
