@@ -34,7 +34,7 @@ RUN bash /app/crossfiles/deps.sh
 FROM cross_build_base AS libde265
 RUN git clone -b "v1.0.15" --depth 1 "https://github.com/strukturag/libde265"
 RUN mkdir build_libde265 && cd build_libde265
-RUN sh -c "source /app/crossfiles/autoenv.sh && cmake ../libde265 -DBUILD_SHARED_LIBS=false -DENABLE_DECODER=false -DCMAKE_TOOLCHAIN_FILE=/app/crossfiles/toolchain.cmake"
+RUN bash -c "source /app/crossfiles/autoenv.sh && cmake ../libde265 -DBUILD_SHARED_LIBS=false -DENABLE_DECODER=false -DCMAKE_TOOLCHAIN_FILE=/app/crossfiles/toolchain.cmake"
 RUN make -j $(nproc)
 RUN cmake --install . --prefix /heif
 
@@ -43,7 +43,7 @@ RUN git clone -b "v1.19.3" --depth 1 "https://github.com/strukturag/libheif"
 COPY --from=libwebp /heif /heif
 COPY --from=libde265 /heif /heif
 RUN mkdir build_libheif && cd build_libheif
-RUN sh -c "source /app/crossfiles/autoenv.sh && \
+RUN bash -c "source /app/crossfiles/autoenv.sh && \
  cmake ../libheif -DWITH_OpenJPEG_DECODER=false -DWITH_OpenJPEG_ENCODER=false -DWITH_LIBSHARPYUV=true -DWITH_AOM_DECODER=false -DWITH_AOM_ENCODER=false -DWITH_X265=false -DWITH_OpenH264_DECODER=false -DBUILD_SHARED_LIBS=false \
  -DLIBDE265_INCLUDE_DIR=/heif/include -DLIBDE265_LIBRARY=/heif/lib/libde265.a -DLIBSHARPYUV_INCLUDE_DIR=/heif/include/webp -DLIBSHARPYUV_LIBRARY=/heif/lib/libsharpyuv.a -DCMAKE_INSTALL_PREFIX=/heif -DCMAKE_TOOLCHAIN_FILE=/app/crossfiles/toolchain.cmake"
 RUN make -j $(nproc)
