@@ -27,8 +27,8 @@ ARG BUILDARCH
 ARG TARGETARCH
 ARG TARGETVARIANT
 RUN apt-get update && apt-get install -y clang musl-dev pkg-config nasm curl git cmake make
-RUN bash /app/crossfiles/toolchain.sh
 COPY crossfiles /app/crossfiles
+RUN bash /app/crossfiles/toolchain.sh
 RUN bash /app/crossfiles/deps.sh
 
 FROM cross_build_base AS libde265
