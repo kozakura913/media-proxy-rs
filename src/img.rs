@@ -120,6 +120,26 @@ impl RequestContext{
 							}
 						}
 					}
+					Some(Ok("image/heic"))=>{
+						let img={
+							let lib_heif=libheif_rs::LibHeif::new();
+							let ctx=libheif_rs::HeifContext::read_from_bytes(&self.src_bytes).unwrap();
+							let handle=ctx.primary_image_handle().unwrap();
+							let image = lib_heif.decode(
+								&handle,
+								libheif_rs::ColorSpace::Rgb(libheif_rs::RgbChroma::Rgba),
+								libheif_rs::DecodingOptions::new().map(|mut o| {
+									o.set_convert_hdr_to_8bit(true);
+									o
+								}),
+							).unwrap();
+							let planes=image.planes();
+							let interleaved_plane=planes.interleaved.unwrap();
+							let raw=interleaved_plane.data.to_vec();
+							DynamicImage::ImageRgba8(image::RgbaImage::from_raw(interleaved_plane.width, interleaved_plane.height, raw).unwrap())
+						};
+						return self.response_img(img);
+					},
 					_=>{
 						self.headers.append("X-Proxy-Error",format!("CodecError:{:?}",e).parse().unwrap());
 						return (axum::http::StatusCode::BAD_GATEWAY,self.headers.clone()).into_response();

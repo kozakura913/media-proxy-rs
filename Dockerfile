@@ -1,11 +1,19 @@
 FROM alpine:latest AS c_build_env
-RUN apk add --no-cache make clang musl-dev meson ninja pkgconfig nasm git
+RUN apk add --no-cache make clang musl-dev meson ninja pkgconfig nasm git cmake
 
 FROM c_build_env AS dav1d
 RUN git clone --branch 1.3.0 --depth 1 https://code.videolan.org/videolan/dav1d.git /dav1d_src
 RUN cd /dav1d_src && meson build -Dprefix=/dav1d -Denable_tools=false -Denable_examples=false -Ddefault_library=static --buildtype release
 RUN cd /dav1d_src && ninja -C build
 RUN cd /dav1d_src && ninja -C build install
+
+FROM c_build_env AS libwebp
+RUN git clone -b "v1.4.0" --depth 1 "https://chromium.googlesource.com/webm/libwebp.git"
+RUN mkdir /heif
+RUN mkdir build_libwebp && cd build_libwebp
+RUN cmake ../libwebp -DBUILD_SHARED_LIBS=false -DCMAKE_BUILD_TYPE=Release
+RUN make -j $(nproc)
+RUN cmake --install . --prefix /heif
 
 FROM c_build_env AS lcms2
 RUN git clone -b lcms2.16 --depth 1 https://github.com/mm2/Little-CMS.git /lcms2_src
@@ -14,24 +22,48 @@ RUN cd /lcms2_src && ./configure
 RUN cd /lcms2_src && make
 RUN cd /lcms2_src && make DESTDIR=/lcms2 install
 
-FROM --platform=$BUILDPLATFORM rust AS build_app
+FROM --platform=$BUILDPLATFORM rust AS cross_build_base
 ARG BUILDARCH
 ARG TARGETARCH
 ARG TARGETVARIANT
-#RUN apk add --no-cache clang musl-dev curl pkgconfig nasm mold git
-RUN apt-get update && apt-get install -y clang musl-dev pkg-config nasm mold git
+RUN apt-get update && apt-get install -y clang musl-dev pkg-config nasm curl git cmake make
+COPY crossfiles /app/crossfiles
+RUN bash /app/crossfiles/toolchain.sh
+RUN bash /app/crossfiles/deps.sh
+
+FROM cross_build_base AS libde265
+RUN git clone -b "v1.0.15" --depth 1 "https://github.com/strukturag/libde265"
+RUN mkdir build_libde265 && cd build_libde265
+RUN bash -c "source /app/crossfiles/autoenv.sh && cmake ../libde265 -DBUILD_SHARED_LIBS=false -DENABLE_DECODER=false -DCMAKE_TOOLCHAIN_FILE=/app/crossfiles/toolchain.cmake"
+RUN make -j $(nproc)
+RUN cmake --install . --prefix /heif
+
+FROM cross_build_base AS heif
+RUN git clone -b "v1.19.3" --depth 1 "https://github.com/strukturag/libheif"
+COPY --from=libwebp /heif /heif
+COPY --from=libde265 /heif /heif
+RUN mkdir build_libheif && cd build_libheif
+RUN bash -c "source /app/crossfiles/autoenv.sh && \
+ cmake ../libheif -DWITH_OpenJPEG_DECODER=false -DWITH_OpenJPEG_ENCODER=false -DWITH_LIBSHARPYUV=true -DWITH_AOM_DECODER=false -DWITH_AOM_ENCODER=false -DWITH_X265=false -DWITH_OpenH264_DECODER=false -DWITH_GDK_PIXBUF=false -DBUILD_SHARED_LIBS=false \
+ -DLIBDE265_INCLUDE_DIR=/heif/include -DLIBDE265_LIBRARY=/heif/lib/libde265.a -DLIBSHARPYUV_INCLUDE_DIR=/heif/include/webp -DLIBSHARPYUV_LIBRARY=/heif/lib/libsharpyuv.a -DCMAKE_INSTALL_PREFIX=/heif -DCMAKE_TOOLCHAIN_FILE=/app/crossfiles/toolchain.cmake"
+RUN make -j $(nproc)
+RUN cmake --install . --prefix /heif
+
+FROM cross_build_base AS build_app
 ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
-COPY crossfiles /app/crossfiles
-RUN bash /app/crossfiles/deps.sh
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
-COPY .gitmodules ./.gitmodules
 COPY --from=dav1d /dav1d /dav1d
 COPY --from=lcms2 /lcms2 /lcms2
+COPY --from=heif /heif /heif
 RUN cp -r /lcms2/usr/local/lib/* /dav1d/lib
-ENV PKG_CONFIG_PATH=/dav1d/lib/pkgconfig
+RUN cp -r /heif/lib/* /dav1d/lib
 ENV LD_LIBRARY_PATH=/dav1d/lib
+COPY --from=heif /heif/lib/pkgconfig /pkgconfig
+COPY --from=dav1d /dav1d/lib/pkgconfig /pkgconfig
+COPY --from=heif /heif /heif
+ENV PKG_CONFIG_PATH=/pkgconfig
 COPY src ./src
 COPY Cargo.toml ./Cargo.toml
 COPY asset ./asset

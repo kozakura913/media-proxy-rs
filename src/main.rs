@@ -364,6 +364,11 @@ impl RequestContext{
 						self.headers.remove("Content-Type");
 						self.headers.append("Content-Type", "image/jxr".parse().unwrap());
 					}
+					if head.starts_with(b"ftypheic"){
+						is_img=true;
+						self.headers.remove("Content-Type");
+						self.headers.append("Content-Type", "image/heic".parse().unwrap());
+					}
 				}
 			}
 		}
