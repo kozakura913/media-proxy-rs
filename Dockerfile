@@ -44,7 +44,7 @@ COPY --from=libwebp /heif /heif
 COPY --from=libde265 /heif /heif
 RUN mkdir build_libheif && cd build_libheif
 RUN bash -c "source /app/crossfiles/autoenv.sh && \
- cmake ../libheif -DWITH_OpenJPEG_DECODER=false -DWITH_OpenJPEG_ENCODER=false -DWITH_LIBSHARPYUV=true -DWITH_AOM_DECODER=false -DWITH_AOM_ENCODER=false -DWITH_X265=false -DWITH_OpenH264_DECODER=false -DBUILD_SHARED_LIBS=false \
+ cmake ../libheif -DWITH_OpenJPEG_DECODER=false -DWITH_OpenJPEG_ENCODER=false -DWITH_LIBSHARPYUV=true -DWITH_AOM_DECODER=false -DWITH_AOM_ENCODER=false -DWITH_X265=false -DWITH_OpenH264_DECODER=false -DWITH_GDK_PIXBUF=false -DBUILD_SHARED_LIBS=false \
  -DLIBDE265_INCLUDE_DIR=/heif/include -DLIBDE265_LIBRARY=/heif/lib/libde265.a -DLIBSHARPYUV_INCLUDE_DIR=/heif/include/webp -DLIBSHARPYUV_LIBRARY=/heif/lib/libsharpyuv.a -DCMAKE_INSTALL_PREFIX=/heif -DCMAKE_TOOLCHAIN_FILE=/app/crossfiles/toolchain.cmake"
 RUN make -j $(nproc)
 RUN cmake --install . --prefix /heif
