@@ -61,9 +61,6 @@ COPY crossfiles /app/crossfiles
 RUN bash /app/crossfiles/deps.sh
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
-COPY --from=libclang /libclang /libclang
-ENV LIBCLANG_PATH=/libclang
-COPY .gitmodules ./.gitmodules
 COPY --from=dav1d /dav1d /dav1d
 COPY --from=lcms2 /lcms2 /lcms2
 COPY --from=heif /heif /heif
