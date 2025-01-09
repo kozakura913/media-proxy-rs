@@ -23,7 +23,6 @@ RUN apt-get update && apt-get install -y clang musl-dev pkg-config nasm mold git
 ENV CARGO_HOME=/var/cache/cargo
 ENV SYSTEM_DEPS_LINK=static
 COPY crossfiles /app/crossfiles
-RUN rustup default beta
 RUN bash /app/crossfiles/deps.sh
 WORKDIR /app
 COPY avif-decoder_dep ./avif-decoder_dep
