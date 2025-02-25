@@ -233,9 +233,11 @@ jobs:
           docker image ls -a
       - name: Setup ImageMagick
         uses: mfinelli/setup-imagemagick@v6
+      - name: Install APT Packages
+        run: |
+          apt install libjxr-tools
       - name: Setup Source Images
         run: |
-          ls .
           mkdir ${{ runner.temp }}/http
           magick asset/dummy.png -resize 512x512 ${{ runner.temp }}/http/jpeg.jpg
           magick asset/dummy.png ${{ runner.temp }}/http/static.webp
