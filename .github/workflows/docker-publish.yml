@@ -251,6 +251,7 @@ jobs:
           docker run -d --platform ${{ matrix.platform }} ${{ github.repository }}:latest
       - name: Curl Test
         run: |
+          sleep 10
           curl -vv -O http://localhost:12766/test.webp
 
   merge:
