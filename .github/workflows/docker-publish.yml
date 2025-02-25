@@ -228,8 +228,9 @@ jobs:
       - name: Run App
         run: |
           docker run --platform ${{ matrix.platform }} ${{ github.repository }}:latest
-      - name: Setup Source Images
+      - name: Setup ImageMagick
         uses: mfinelli/setup-imagemagick@v6
+      - name: Setup Source Images
         run: |
           magick asset/dummy.png -resize 512x512 ${{ runner.temp }}/http/jpeg.jpg
           magick asset/dummy.png ${{ runner.temp }}/http/static.webp
