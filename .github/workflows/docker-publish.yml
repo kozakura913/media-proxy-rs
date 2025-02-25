@@ -212,6 +212,8 @@ jobs:
         run: |
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+      - name: Checkout repository
+        uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -229,6 +231,7 @@ jobs:
         uses: mfinelli/setup-imagemagick@v6
       - name: Setup Source Images
         run: |
+          mkdir ${{ runner.temp }}/http
           magick asset/dummy.png -resize 512x512 ${{ runner.temp }}/http/jpeg.jpg
           magick asset/dummy.png ${{ runner.temp }}/http/static.webp
           magick -loop 0 -delay 300x1000 "asset/dummy.png" -delay 100x1000 "asset/dummy.png" ${{ runner.temp }}/http/anim.webp
