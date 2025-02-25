@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: '00 15 * * *'
   push:
-    branches: [ "main" ]
+    branches: [ "main" ,"e2e"]
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
@@ -53,6 +53,8 @@ jobs:
           submodules: recursive
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+        with:
+          image: public.ecr.aws/vend/tonistiigi/binfmt:latest
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Log into registry ${{ env.REGISTRY }}
@@ -102,7 +104,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
           cache-from: type=gha
-          cache-to: type=gha,mode=min
+          cache-to: type=gha,mode=min,scope=platform-${{ env.PLATFORM_PAIR }}
 
       - name: Build and export to Docker
         uses: docker/build-push-action@v6
@@ -110,9 +112,10 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           load: true
+          outputs: type=docker,dest=${{ runner.temp }}/${{ env.PLATFORM_PAIR }}.tar
           tags: ${{ github.repository }}:latest
           cache-from: type=gha
-          cache-to: type=gha,mode=min
+          cache-to: type=gha,mode=min,scope=platform-${{ env.PLATFORM_PAIR }}
 
       - name: Export digest
         run: |
@@ -127,19 +130,11 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      - name: Extract Application
-        run: |
-          mkdir /tmp/app/
-          chmod o+rwx /tmp/app/
-          docker run --rm -t -v /tmp/app:/tmp/app ${{ github.repository }}:latest cp /media-proxy-rs/media-proxy-rs /tmp/app/
-
-      - name: Upload Application
+      - name: Upload Docker Image
         uses: actions/upload-artifact@v4
         with:
-          name: media-proxy-rs_${{ env.PLATFORM_PAIR }}
-          path: /tmp/app/media-proxy-rs
-          if-no-files-found: error
-          retention-days: 1
+          name: ${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/${{ env.PLATFORM_PAIR }}.tar
 
   release:
     runs-on: ubuntu-latest
@@ -163,12 +158,22 @@ jobs:
         run: |
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
-      - name: Download Application
+      - name: Download Docker Image
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/app
-          pattern: media-proxy-rs_${{ env.PLATFORM_PAIR }}
-          merge-multiple: true
+          name: ${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}
+      - name: Load image
+        run: |
+          docker load --input ${{ runner.temp }}/${{ env.PLATFORM_PAIR }}.tar
+          docker image ls -a
+
+      - name: Extract Application
+        run: |
+          mkdir /tmp/app/
+          chmod o+rwx /tmp/app/
+          docker run --rm -t -v /tmp/app:/tmp/app ${{ github.repository }}:latest cp /media-proxy-rs/media-proxy-rs /tmp/app/
+
       - name: gzip Application
         working-directory: /tmp/app
         run: |
@@ -183,6 +188,38 @@ jobs:
           asset_content_type: application/gzip # required by GitHub API
           max_releases: 7 # optional, if there are more releases than this matching the asset_name, the oldest ones are going to be deleted
           ignore_hash: true
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/386
+          - linux/amd64
+          - linux/arm64
+          - linux/arm/v6
+          - linux/arm/v7
+    steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          image: public.ecr.aws/vend/tonistiigi/binfmt:latest
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dockerimage
+          path: ${{ runner.temp }}
+      - name: Load image
+        run: |
+          docker load --input ${{ runner.temp }}/dockerimage.tar
+          docker image ls -a
 
   merge:
     runs-on: ubuntu-latest
