@@ -95,7 +95,6 @@ jobs:
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
       - name: Build and Export
-        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -109,6 +108,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image
         if: github.event_name != 'pull_request'
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
