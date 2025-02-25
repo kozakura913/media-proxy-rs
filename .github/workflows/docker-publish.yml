@@ -225,12 +225,12 @@ jobs:
         run: |
           docker load --input ${{ runner.temp }}/${{ env.PLATFORM_PAIR }}.tar
           docker image ls -a
-      - name: Load image
+      - name: Run App
         run: |
           docker run --platform ${{ matrix.platform }} ${{ github.repository }}:latest
       - uses: mfinelli/setup-imagemagick@v6
         run: magick asset/dummy.png -resize 512x512 ${{ runner.temp }}/http/jpeg.jpg
-      - name: Load image
+      - name: Curl Test
         run: |
           curl -vv -O http://localhost:12766/test.webp
 
