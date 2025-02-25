@@ -228,8 +228,16 @@ jobs:
       - name: Run App
         run: |
           docker run --platform ${{ matrix.platform }} ${{ github.repository }}:latest
-#      - uses: mfinelli/setup-imagemagick@v6
-#        run: magick asset/dummy.png -resize 512x512 ${{ runner.temp }}/http/jpeg.jpg
+      - name: Setup Source Images
+        uses: mfinelli/setup-imagemagick@v6
+        run: |
+          magick asset/dummy.png -resize 512x512 ${{ runner.temp }}/http/jpeg.jpg
+          magick asset/dummy.png ${{ runner.temp }}/http/static.webp
+          magick -loop 0 -delay 300x1000 "asset/dummy.png" -delay 100x1000 "asset/dummy.png" ${{ runner.temp }}/http/anim.webp
+          magick asset/dummy.png ${{ runner.temp }}/http/jpeg-xr.jxr
+          magick asset/dummy.png ${{ runner.temp }}/http/jpeg2000.jp2
+          magick asset/dummy.png ${{ runner.temp }}/http/avif.avif
+          magick asset/dummy.png ${{ runner.temp }}/http/tiff.tiff
       - name: Curl Test
         run: |
           curl -vv -O http://localhost:12766/test.webp
