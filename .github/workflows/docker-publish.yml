@@ -226,6 +226,15 @@ jobs:
           docker run --rm --platform ${{ matrix.platform }} ${{ env.PLATFORM_PAIR }}
       - uses: mfinelli/setup-imagemagick@v6
         run: magick asset/dummy.png -resize 512x512 ${{ runner.temp }}/http/jpeg.jpg
+      - name: Http Server
+        uses: Eun/http-server-action@v1
+        with:
+          directory: ${{ runner.temp }}/http
+          port: 8080
+        run: |
+          cd ${{ runner.temp }}
+          curl -O http://localhost:8080/jpeg.jpg
+          ls && exit 1
   merge:
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' }}
