@@ -252,6 +252,7 @@ jobs:
           magick asset/dummy.png ${{ runner.temp }}/http/tiff.tiff
           magick asset/dummy.png ${{ runner.temp }}/http/tga.tga
           magick asset/dummy.png ${{ runner.temp }}/http/icon.ico
+          magick asset/dummy.png ${{ runner.temp }}/http/open-exr.exr
       - name: Run App
         run: |
           docker run -d -p 12766:12766 --platform ${{ matrix.platform }} ${{ github.repository }}:latest
@@ -276,13 +277,14 @@ jobs:
               "tiff": "image/tiff",
               "tga": "image/x-tga",
               "ico": "image/x-icon",
+              "exr": "image/x-exr",
               "txt": "text/plain"
             }
       - name: Curl Test
         run: |
           sleep 10
           ls ${{ runner.temp }}/http
-          curl -vv -O http://localhost:12766/test.webp?url=http://localhost:8080/jpeg-xr.jxr
+          curl -vv http://localhost:12766/test.webp?url=http%3A%2F%2Flocalhost%3A8080%2Fjpeg-xr.jxr | cat
 
   merge:
     runs-on: ubuntu-latest
