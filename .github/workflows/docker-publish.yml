@@ -235,7 +235,7 @@ jobs:
         uses: mfinelli/setup-imagemagick@v6
       - name: Install APT Packages
         run: |
-          apt install libjxr-tools
+          sudo apt-get install -y install libjxr-tools
       - name: Setup Source Images
         run: |
           mkdir ${{ runner.temp }}/http
