@@ -260,8 +260,10 @@ jobs:
       - name: Curl Test
         run: |
           sleep 10
-          ls ${{ runner.temp }}/http | xargs -I{} curl http://localhost:8080/{}
-          curl -vv http://localhost:12766/test.webp?url=http%3A%2F%2Flocalhost%3A8080%2Fjpeg-xr.jxr | cat
+          mkdir ${{ runner.temp }}/result
+          ls ${{ runner.temp }}/http | xargs -I{} bash -c "curl -vvo ${{ runner.temp }}/result/{}.webp http://localhost:12766/test.webp?url=http%3A%2F%2Flocalhost%3A8080%2F{}"
+          #空のファイルがあると失敗する
+          ls ${{ runner.temp }}/result | xargs -I{} test -s {}
 
   merge:
     runs-on: ubuntu-latest
