@@ -255,13 +255,14 @@ jobs:
           magick asset/dummy.png ${{ runner.temp }}/http/open-exr.exr
       - name: Run App
         run: |
-          docker run -d -p 12766:12766 --platform ${{ matrix.platform }} ${{ github.repository }}:latest
-          docker run -d -p 8080:80 -v ${{ runner.temp }}/http:/usr/share/nginx/html public.ecr.aws/nginx/nginx:stable-alpine
+          docker network create --driver bridge servers
+          docker run -d -p 12766:12766 --net=servers --platform ${{ matrix.platform }} ${{ github.repository }}:latest
+          docker run -d -p 8080:80 --net=servers --name nginx -v ${{ runner.temp }}/http:/usr/share/nginx/html public.ecr.aws/nginx/nginx:stable-alpine
       - name: Curl Test
         run: |
           sleep 10
           mkdir ${{ runner.temp }}/result
-          ls ${{ runner.temp }}/http | xargs -I{} bash -c "curl -vvo ${{ runner.temp }}/result/{}.webp http://localhost:12766/test.webp?url=http%3A%2F%2Flocalhost%3A8080%2F{}"
+          ls ${{ runner.temp }}/http | xargs -I{} bash -c "curl -vvo ${{ runner.temp }}/result/{}.webp http://localhost:12766/test.webp?url=http%3A%2F%2Fnginx%2F{}"
           #空のファイルがあると失敗する
           ls ${{ runner.temp }}/result | xargs -I{} test -s {}
 
