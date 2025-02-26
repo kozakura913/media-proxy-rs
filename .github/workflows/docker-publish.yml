@@ -245,7 +245,8 @@ jobs:
           magick -loop 0 -delay 300x1000 "asset/dummy.png" -delay 100x1000 "asset/dummy.png" ${{ runner.temp }}/http/anim.gif
           magick asset/dummy.png ${{ runner.temp }}/http/static.webp
           magick -loop 0 -delay 300x1000 "asset/dummy.png" -delay 100x1000 "asset/dummy.png" ${{ runner.temp }}/http/anim.webp
-          magick asset/dummy.png ${{ runner.temp }}/http/jpeg-xr.jxr
+          magick asset/dummy.png ${{ runner.temp }}/http/bmp.bmp
+          JxrEncApp -i ${{ runner.temp }}/http/bmp.bmp -o ${{ runner.temp }}/http/jpeg-xr.jxr
           magick asset/dummy.png ${{ runner.temp }}/http/jpeg-xl.jxl
           magick asset/dummy.png ${{ runner.temp }}/http/jpeg2000.jp2
           magick asset/dummy.png ${{ runner.temp }}/http/avif.avif
