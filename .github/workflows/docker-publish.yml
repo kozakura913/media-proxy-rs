@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: '00 15 * * *'
   push:
-    branches: [ "main" ,"e2e"]
+    branches: [ "main" ]
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
   pull_request:
@@ -141,6 +141,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     permissions:
       contents: write
       id-token: write
