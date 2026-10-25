@@ -27,10 +27,18 @@ pub(crate) fn convert_to_srgb(img: DynamicImage, icc: &[u8]) -> Result<DynamicIm
 	// Gray の画素が RGBA に展開されている場合もある。
 	// 入力プロファイルの色空間に合わせて Gray 入力を選択する。
 	let use_gray = input.color_space() == ColorSpaceSignature::GrayData;
-	let in_format = if use_gray {
-		PixelFormat::GRAYA_8
-	} else {
-		PixelFormat::RGBA_8
+	let use_16bit = matches!(
+		img,
+		DynamicImage::ImageLuma16(_)
+			| DynamicImage::ImageLumaA16(_)
+			| DynamicImage::ImageRgb16(_)
+			| DynamicImage::ImageRgba16(_)
+	);
+	let in_format = match (use_gray, use_16bit) {
+		(true, true) => PixelFormat::GRAYA_16,
+		(false, true) => PixelFormat::RGBA_16,
+		(true, false) => PixelFormat::GRAYA_8,
+		(false, false) => PixelFormat::RGBA_8,
 	};
 	let transform = match Transform::new_flags(
 		&input,
@@ -45,12 +53,21 @@ pub(crate) fn convert_to_srgb(img: DynamicImage, icc: &[u8]) -> Result<DynamicIm
 	};
 
 	let (width, height) = (img.width(), img.height());
-	let (src, input_bpp) = if use_gray {
-		(img.into_luma_alpha8().into_raw(), 2)
+	// 16bit 入力は ICC 変換前に量子化しない。
+	// LittleCMS のネイティブエンディアン形式に合わせてバイト列へ変換する。
+	let src = if use_16bit {
+		let samples = if use_gray {
+			img.into_luma_alpha16().into_raw()
+		} else {
+			img.into_rgba16().into_raw()
+		};
+		samples.into_iter().flat_map(u16::to_ne_bytes).collect()
+	} else if use_gray {
+		img.into_luma_alpha8().into_raw()
 	} else {
-		(img.into_rgba8().into_raw(), 4)
+		img.into_rgba8().into_raw()
 	};
-	let pixels = src.len() / input_bpp;
+	let pixels = src.len() / in_format.bytes_per_pixel();
 	let mut dst = vec![0u8; pixels * 4];
 	transform.transform_pixels(&src, &mut dst);
 	let rgba = image::RgbaImage::from_raw(width, height, dst)

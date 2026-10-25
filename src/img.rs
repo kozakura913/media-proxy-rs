@@ -639,6 +639,19 @@ pub(crate) fn encode_anim(
 	cfg: &ProcessorConfig,
 	icc: Option<Vec<u8>>,
 ) -> Result<Encoded, ProcessError> {
+	// アニメーションは RGBA フレームへ展開されるため、Gray ICC を
+	// そのまま RGB WebP に転送できない。sRGB 化した画素を可逆圧縮する。
+	let mut icc = icc;
+	let gray_icc = if opts.lossless
+		&& icc
+			.as_deref()
+			.and_then(|profile| lcms2::Profile::new_icc(profile).ok())
+			.is_some_and(|profile| profile.color_space() == lcms2::ColorSpaceSignature::GrayData)
+	{
+		icc.take()
+	} else {
+		None
+	};
 	// AVIF は image crate 0.25 でアニメーションエンコード未対応のため、
 	// アニメーション入力は WebP アニメーションで出力する。
 	let conf = webp_config(opts, cfg)?;
@@ -659,6 +672,15 @@ pub(crate) fn encode_anim(
 		if let Ok(frame) = frame {
 			timestamp += Duration::from(frame.delay()).as_millis() as i32;
 			let img = DynamicImage::ImageRgba8(frame.into_buffer());
+			let img = match gray_icc.as_deref() {
+				Some(profile) => crate::color::convert_to_srgb(img, profile).map_err(|_| {
+					ProcessError::new(
+						ProcessErrorKind::Decode,
+						"Gray ICC to sRGB conversion failed",
+					)
+				})?,
+				None => img,
+			};
 			let img = if !opts.lossless {
 				match icc.as_deref() {
 					Some(profile) => {
@@ -951,8 +973,8 @@ fn decode_cmyk_jpeg(
 	})?;
 	decoder.set_max_decoding_buffer_size(expected);
 
-	// jpeg-decoder は CMYK 画像を標準 CMYK（0=紙白）の interleaved データとして返す。
-	let cmyk = decoder.decode().map_err(|e| {
+	// jpeg-decoder 0.3.2 は CMYK を反転し、YCCK は K を反転して返す。
+	let mut cmyk = decoder.decode().map_err(|e| {
 		ProcessError::new(
 			ProcessErrorKind::Decode,
 			format!("CMYK JPEG decode: {:?}", e),
@@ -963,6 +985,13 @@ fn decode_cmyk_jpeg(
 			ProcessErrorKind::Decode,
 			"Invalid CMYK buffer size",
 		));
+	}
+	// Adobe CMYK / YCCK では上のデコーダ出力をそのまま使う。
+	// APP14 のない通常 CMYK では、デコーダによる反転を戻す。
+	if adobe.is_none() {
+		for value in &mut cmyk {
+			*value = 255 - *value;
+		}
 	}
 
 	let srgb = lcms2::Profile::new_srgb();
