@@ -1023,17 +1023,13 @@ pub(crate) fn exif_rotate(src: &[u8], img: DynamicImage) -> DynamicImage {
 			match e.tag {
 				rexif::ExifTag::Orientation => {
 					return match e.value.to_i64(0).unwrap_or(0) {
-						2 => DynamicImage::ImageRgba8(image::imageops::flip_horizontal(&img)),
-						3 => DynamicImage::ImageRgba8(image::imageops::rotate180(&img)),
-						4 => DynamicImage::ImageRgba8(image::imageops::flip_vertical(&img)),
-						5 => DynamicImage::ImageRgba8(image::imageops::flip_horizontal(
-							&image::imageops::rotate90(&img),
-						)),
-						6 => DynamicImage::ImageRgba8(image::imageops::rotate90(&img)),
-						7 => DynamicImage::ImageRgba8(image::imageops::flip_horizontal(
-							&image::imageops::rotate270(&img),
-						)),
-						8 => DynamicImage::ImageRgba8(image::imageops::rotate270(&img)),
+						2 => img.fliph(),
+						3 => img.rotate180(),
+						4 => img.flipv(),
+						5 => img.rotate90().fliph(),
+						6 => img.rotate90(),
+						7 => img.rotate270().fliph(),
+						8 => img.rotate270(),
 						_ => img,
 					};
 				}
@@ -1462,5 +1458,49 @@ mod tests {
 		assert!(err
 			.message
 			.contains(&format!("FramesLimit {}", ANIMATION_FRAMES_LIMIT)));
+	}
+
+	fn tiff_with_orientation(img: &image::GrayImage, orientation: u16) -> Vec<u8> {
+		let width = img.width();
+		let height = img.height();
+		let strip_byte_counts = (width * height) as usize;
+		let ifd_size = 2 + 10 * 12 + 4;
+		let data_offset = 8 + ifd_size;
+		let mut out = Vec::new();
+		out.extend_from_slice(b"II");
+		out.extend_from_slice(&42u16.to_le_bytes());
+		out.extend_from_slice(&8u32.to_le_bytes());
+		out.extend_from_slice(&10u16.to_le_bytes());
+		let entries = [
+			(256u16, 3u16, 1u32, width as u32),             // ImageWidth
+			(257u16, 3u16, 1u32, height as u32),            // ImageLength
+			(258u16, 3u16, 1u32, 8u32),                     // BitsPerSample
+			(259u16, 3u16, 1u32, 1u32),                     // Compression
+			(262u16, 3u16, 1u32, 1u32),                     // PhotometricInterpretation
+			(273u16, 4u16, 1u32, data_offset as u32),       // StripOffsets
+			(274u16, 3u16, 1u32, orientation as u32),       // Orientation
+			(277u16, 3u16, 1u32, 1u32),                     // SamplesPerPixel
+			(278u16, 4u16, 1u32, height as u32),            // RowsPerStrip
+			(279u16, 4u16, 1u32, strip_byte_counts as u32), // StripByteCounts
+		];
+		for (tag, typ, count, value) in entries {
+			out.extend_from_slice(&tag.to_le_bytes());
+			out.extend_from_slice(&typ.to_le_bytes());
+			out.extend_from_slice(&count.to_le_bytes());
+			out.extend_from_slice(&value.to_le_bytes());
+		}
+		out.extend_from_slice(&0u32.to_le_bytes());
+		out.extend_from_slice(img.as_raw());
+		out
+	}
+
+	#[test]
+	fn exif_rotate_preserves_gray_pixels() {
+		let img = image::GrayImage::from_pixel(8, 8, image::Luma([123]));
+		let src = tiff_with_orientation(&img, 6);
+		let rotated = exif_rotate(&src, DynamicImage::ImageLuma8(img.clone()));
+		assert!(matches!(rotated, DynamicImage::ImageLuma8(_)));
+		// Orientation=6 (rotate90) swaps width and height.
+		assert_eq!(rotated.dimensions(), (8, 8));
 	}
 }

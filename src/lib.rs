@@ -829,6 +829,73 @@ mod tests {
 		assert_eq!(webp_icc(&encoded.bytes).as_deref(), Some(icc.as_slice()));
 	}
 
+	fn jpeg_app1_exif_orientation(orientation: u16) -> Vec<u8> {
+		let mut exif = Vec::new();
+		exif.extend_from_slice(b"Exif\0\0");
+		exif.extend_from_slice(b"II");
+		exif.extend_from_slice(&0x002Au16.to_le_bytes());
+		exif.extend_from_slice(&8u32.to_le_bytes());
+		exif.extend_from_slice(&1u16.to_le_bytes()); // entry count
+		exif.extend_from_slice(&0x0112u16.to_le_bytes()); // Orientation
+		exif.extend_from_slice(&3u16.to_le_bytes()); // SHORT
+		exif.extend_from_slice(&1u32.to_le_bytes()); // count
+		exif.extend_from_slice(&(orientation as u32).to_le_bytes());
+		exif.extend_from_slice(&0u32.to_le_bytes()); // next IFD
+		let len = exif.len() + 2;
+		let mut app1 = Vec::new();
+		app1.extend_from_slice(&[0xFF, 0xE1]);
+		app1.extend_from_slice(&(len as u16).to_be_bytes());
+		app1.extend_from_slice(&exif);
+		app1
+	}
+
+	fn jpeg_with_icc_and_orientation(
+		img: &image::GrayImage,
+		icc: &[u8],
+		orientation: u16,
+	) -> Vec<u8> {
+		use image::ImageEncoder;
+		let mut jpeg = vec![];
+		let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 95);
+		encoder.set_icc_profile(icc.to_vec()).unwrap();
+		encoder
+			.write_image(
+				img.as_raw(),
+				img.width(),
+				img.height(),
+				image::ExtendedColorType::L8,
+			)
+			.unwrap();
+		let app1 = jpeg_app1_exif_orientation(orientation);
+		let mut out = Vec::with_capacity(jpeg.len() + app1.len());
+		out.extend_from_slice(&jpeg[..2]); // SOI
+		out.extend_from_slice(&app1);
+		out.extend_from_slice(&jpeg[2..]);
+		out
+	}
+
+	#[test]
+	fn process_lossless_gray_icc_jpeg_with_orientation_fallback_to_png() {
+		let img = image::GrayImage::from_pixel(8, 8, image::Luma([123]));
+		let icc = gray_icc_profile();
+		let src = jpeg_with_icc_and_orientation(&img, &icc, 6);
+		let processor = Processor::new(ProcessorConfig::default());
+		let encoded = processor
+			.process(
+				&src,
+				&ProcessOptions {
+					lossless: true,
+					..Default::default()
+				},
+			)
+			.unwrap();
+		assert_eq!(encoded.content_type, "image/png");
+		assert_eq!(png_icc(&encoded.bytes).as_deref(), Some(icc.as_slice()));
+		let decoded =
+			image::load_from_memory_with_format(&encoded.bytes, image::ImageFormat::Png).unwrap();
+		assert!(matches!(decoded, DynamicImage::ImageLuma8(_)));
+	}
+
 	#[test]
 	fn process_lossy_converts_icc_to_srgb() {
 		let img = image::RgbaImage::from_pixel(8, 8, image::Rgba([32, 200, 64, 255]));
