@@ -731,6 +731,20 @@ pub(crate) fn encode_single(
 	codec: image::ImageFormat,
 	icc: Option<Vec<u8>>,
 ) -> Result<Encoded, ProcessError> {
+	// ICC プロファイルが CMYK の JPEG は、image crate（zune-jpeg）が CMYK 生データを
+	// 返さないため専用経路でデコード・変換する。
+	if codec == image::ImageFormat::Jpeg {
+		if let Some(profile) = icc.as_deref() {
+			let is_cmyk = lcms2::Profile::new_icc(profile)
+				.map(|p| p.color_space() == lcms2::ColorSpaceSignature::CmykData)
+				.unwrap_or(false);
+			if is_cmyk {
+				let img = decode_cmyk_jpeg(src, profile, cfg)?;
+				return response_img(img, src, Some(codec), opts, cfg, None);
+			}
+		}
+	}
+
 	let max_alloc = cfg.max_decode_pixels.saturating_mul(4);
 	let mut reader = image::ImageReader::with_format(Cursor::new(src), codec);
 	let mut limits = image::Limits::default();
@@ -836,6 +850,149 @@ pub(crate) fn response_img(
 			warning: None,
 		})
 	}
+}
+
+/// JPEG の APP14 マーカーから Adobe transform 値を取得する。
+/// APP14 がなければ None、SOS/EOI に達するか壊れている場合も None を返す。
+fn cmyk_jpeg_adobe_transform(src: &[u8]) -> Option<u8> {
+	if !src.starts_with(&[0xff, 0xd8]) {
+		return None;
+	}
+	let mut off = 2usize;
+	loop {
+		if *src.get(off)? != 0xff {
+			return None;
+		}
+		while *src.get(off)? == 0xff {
+			off += 1;
+		}
+		let marker = *src.get(off)?;
+		off += 1;
+		match marker {
+			0xda | 0xd9 => return None,
+			0x01 | 0xd0..=0xd8 => continue,
+			0x00 => return None,
+			_ => {}
+		}
+		let len = u16::from_be_bytes([*src.get(off)?, *src.get(off + 1)?]) as usize;
+		if len < 2 {
+			return None;
+		}
+		let end = off.checked_add(len)?;
+		let data = src.get(off + 2..end)?;
+		if marker == 0xee && data.len() >= 12 && data.starts_with(b"Adobe") {
+			return Some(data[11]);
+		}
+		off = end;
+	}
+}
+
+/// CMYK ICC プロファイル付き JPEG をデコードし、sRGB の RgbImage に変換する。
+fn decode_cmyk_jpeg(
+	src: &[u8],
+	icc: &[u8],
+	cfg: &ProcessorConfig,
+) -> Result<DynamicImage, ProcessError> {
+	let input = lcms2::Profile::new_icc(icc).map_err(|e| {
+		ProcessError::new(
+			ProcessErrorKind::Decode,
+			format!("JPEG ICC profile: {:?}", e),
+		)
+	})?;
+	if input.color_space() != lcms2::ColorSpaceSignature::CmykData {
+		return Err(ProcessError::new(
+			ProcessErrorKind::Decode,
+			"JPEG ICC profile is not CMYK",
+		));
+	}
+
+	let adobe = cmyk_jpeg_adobe_transform(src);
+	// Adobe transform=1 は RGB/YCbCr、=2 は YCCK。CMYK ICC が付くべきなのは CMYK のみ。
+	if matches!(adobe, Some(1) | Some(2)) {
+		return Err(ProcessError::new(
+			ProcessErrorKind::Decode,
+			"Unsupported Adobe color transform for CMYK ICC JPEG",
+		));
+	}
+
+	let mut decoder = jpeg_decoder::Decoder::new(Cursor::new(src));
+	decoder.read_info().map_err(|e| {
+		ProcessError::new(
+			ProcessErrorKind::Decode,
+			format!("CMYK JPEG header: {:?}", e),
+		)
+	})?;
+	let info = decoder
+		.info()
+		.ok_or_else(|| ProcessError::new(ProcessErrorKind::Decode, "Missing CMYK JPEG metadata"))?;
+	if info.pixel_format != jpeg_decoder::PixelFormat::CMYK32 {
+		return Err(ProcessError::new(
+			ProcessErrorKind::Decode,
+			"CMYK ICC attached to a non-CMYK JPEG",
+		));
+	}
+
+	let (width, height) = (u32::from(info.width), u32::from(info.height));
+	if !dimensions_allowed_for(cfg.max_decode_pixels, width as u64, height as u64) {
+		return Err(ProcessError::new(
+			ProcessErrorKind::DecodeLimit,
+			format!("DecodeDimensions {}x{} over limit", width, height),
+		));
+	}
+
+	let pixels = (width as usize)
+		.checked_mul(height as usize)
+		.ok_or_else(|| {
+			ProcessError::new(ProcessErrorKind::DecodeLimit, "CMYK JPEG size overflow")
+		})?;
+	let expected = pixels.checked_mul(4).ok_or_else(|| {
+		ProcessError::new(ProcessErrorKind::DecodeLimit, "CMYK JPEG size overflow")
+	})?;
+	decoder.set_max_decoding_buffer_size(expected);
+
+	// jpeg-decoder は CMYK 画像を標準 CMYK（0=紙白）の interleaved データとして返す。
+	let cmyk = decoder.decode().map_err(|e| {
+		ProcessError::new(
+			ProcessErrorKind::Decode,
+			format!("CMYK JPEG decode: {:?}", e),
+		)
+	})?;
+	if cmyk.len() != expected {
+		return Err(ProcessError::new(
+			ProcessErrorKind::Decode,
+			"Invalid CMYK buffer size",
+		));
+	}
+
+	let srgb = lcms2::Profile::new_srgb();
+	let transform: lcms2::Transform<[u8; 4], [u8; 3]> = lcms2::Transform::new(
+		&input,
+		lcms2::PixelFormat::CMYK_8,
+		&srgb,
+		lcms2::PixelFormat::RGB_8,
+		lcms2::Intent::Perceptual,
+	)
+	.map_err(|e| {
+		ProcessError::new(
+			ProcessErrorKind::Decode,
+			format!("CMYK ICC transform: {:?}", e),
+		)
+	})?;
+
+	let mut rgb = image::RgbImage::new(width, height);
+	let mut row_in = vec![[0u8; 4]; width as usize];
+	let mut row_out = vec![[0u8; 3]; width as usize];
+	for (y, row) in cmyk.chunks_exact(width as usize * 4).enumerate() {
+		for (pixel, bytes) in row_in.iter_mut().zip(row.chunks_exact(4)) {
+			pixel.copy_from_slice(bytes);
+		}
+		transform.transform_pixels(&row_in, &mut row_out);
+		for (x, pixel) in row_out.iter().enumerate() {
+			rgb.put_pixel(x as u32, y as u32, image::Rgb(*pixel));
+		}
+	}
+
+	Ok(DynamicImage::ImageRgb8(rgb))
 }
 
 fn badge_entropy(img: &image::GrayImage) -> f32 {

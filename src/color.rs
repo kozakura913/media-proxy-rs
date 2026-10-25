@@ -195,13 +195,21 @@ mod tests {
 		chunks
 	}
 
+	fn srgb_profile() -> Vec<u8> {
+		let mut profile = Profile::new_srgb();
+		let path = std::env::temp_dir().join("media-proxy-rs-test-srgb.icc");
+		profile.save_profile_to_file(&path).unwrap();
+		std::fs::read(&path).unwrap()
+	}
+
 	#[test]
 	fn embeds_iccp_into_simple_vp8l() {
+		let icc = srgb_profile();
 		let mut vp8l = vec![0x2f];
 		let bits = 7u32 | (5u32 << 14) | (1 << 28);
 		vp8l.extend_from_slice(&bits.to_le_bytes());
 		let data = riff(&[(b"VP8L", &vp8l)]);
-		let out = embed_webp_icc(&data, b"profile").unwrap();
+		let out = embed_webp_icc(&data, &icc).unwrap();
 		assert_eq!(&out[0..4], b"RIFF");
 		assert_eq!(
 			u32::from_le_bytes(out[4..8].try_into().unwrap()) as usize,
@@ -213,13 +221,14 @@ mod tests {
 		assert_eq!(&chunks[0].1[4..7], &7u32.to_le_bytes()[..3]);
 		assert_eq!(&chunks[0].1[7..10], &5u32.to_le_bytes()[..3]);
 		assert_eq!(chunks[1].0, *b"ICCP");
-		assert_eq!(chunks[1].1, b"profile");
+		assert_eq!(chunks[1].1, icc);
 		assert_eq!(chunks[2].0, *b"VP8L");
 		assert_eq!(chunks[2].1, vp8l);
 	}
 
 	#[test]
 	fn replaces_existing_iccp_and_keeps_vp8x_first() {
+		let icc = srgb_profile();
 		let vp8x = [0x10, 0, 0, 0, 7, 0, 0, 5, 0, 0];
 		let anim = [0u8; 6];
 		let vp8l = [0x2f, 0, 0, 0, 0];
@@ -229,12 +238,12 @@ mod tests {
 			(b"ANIM", &anim),
 			(b"VP8L", &vp8l),
 		]);
-		let out = embed_webp_icc(&data, b"new-profile").unwrap();
+		let out = embed_webp_icc(&data, &icc).unwrap();
 		let chunks = parse_chunks(&out);
 		assert_eq!(chunks[0].0, *b"VP8X");
 		assert_ne!(chunks[0].1[0] & 0x20, 0);
 		assert_eq!(chunks[1].0, *b"ICCP");
-		assert_eq!(chunks[1].1, b"new-profile");
+		assert_eq!(chunks[1].1, icc);
 		assert_eq!(chunks[2].0, *b"ANIM");
 		assert_eq!(chunks[3].0, *b"VP8L");
 		assert_eq!(chunks.iter().filter(|(id, _)| *id == *b"ICCP").count(), 1);
