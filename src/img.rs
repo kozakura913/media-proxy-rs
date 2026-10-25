@@ -1254,7 +1254,7 @@ fn set_last_anmf_duration(buf: &mut [u8], total_ms: u32) {
 		pos = payload.saturating_add(size).saturating_add(size & 1);
 	}
 	if let Some(off) = last {
-		if total_ms > sum_before_last {
+		if total_ms >= sum_before_last {
 			let d = (total_ms - sum_before_last).min(0xFF_FFFF);
 			buf[off..off + 3].copy_from_slice(&d.to_le_bytes()[..3]);
 		}
