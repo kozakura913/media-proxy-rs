@@ -907,8 +907,9 @@ fn decode_cmyk_jpeg(
 	}
 
 	let adobe = cmyk_jpeg_adobe_transform(src);
-	// Adobe transform=1 は RGB/YCbCr、=2 は YCCK。CMYK ICC が付くべきなのは CMYK のみ。
-	if matches!(adobe, Some(1) | Some(2)) {
+	// YCCK (=2) は CMYK の符号化形式であり、CMYK ICC と併用できる。
+	// jpeg-decoder が CMYK に戻すため、そのまま後続の色変換に渡す。
+	if matches!(adobe, Some(1)) {
 		return Err(ProcessError::new(
 			ProcessErrorKind::Decode,
 			"Unsupported Adobe color transform for CMYK ICC JPEG",
